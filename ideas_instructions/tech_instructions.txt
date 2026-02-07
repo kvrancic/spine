@@ -1,0 +1,386 @@
+Below is a paper‑driven menu of techniques you can lift directly into your project, grouped by your core goals:
+
+- email → graph construction
+- “dead‑man switch” / firing impact
+- communication waste / overload
+- comparing actual vs “ideal” networks
+- client progress and relationship health
+- sentiment/content‑aware graph modeling
+- temporal dynamics and performance
+- how to wire this into an LLM
+
+For each area, there are (a) specific papers and (b) concrete signals/metrics you can compute.
+
+***
+
+## 1. Constructing the Email Communication Graph
+
+### 1.1 Empirical baselines: Enron and large‑scale ONA
+
+**Enron email graph + sentiment**
+
+- SNAP Enron graph (36k nodes, 367k edges) gives a solid baseline for node/edge definitions and sparsification choices. [cs.cornell](https://www.cs.cornell.edu/~arb/data/email-Enron/)
+- A 2024 Enron study combines centrality analysis with sentiment, and explicitly shows that results are *very* sensitive to the edge threshold (e.g., requiring ≥10 emails vs lower), and that centrality rankings change with that threshold. That’s a direct justification for exposing your threshold as a parameter and maybe sweeping it. [arxiv](https://arxiv.org/pdf/2407.21063.pdf)
+
+**Large‑scale passive ONA with email/meetings**
+
+- Haemers’ 2021 master’s thesis (“Exploring Organizational Network Analysis: A Case Study”) uses Microsoft Workplace Analytics on ≈1,100 employees’ email, meetings, chat, and document sharing to compute metrics like network size, network breadth, collaboration overload, and rigidity/silos. [essay.utwente](https://essay.utwente.nl/fileshare/file/87902/Haemers_MA_EEMCS.pdf)
+  It is essentially what you want to build, but with much less graph theory than you can bring to bear.
+
+**Email + social/network structure**
+
+- Alkhereyf & Rambow (LREC 2020) classify emails into business vs personal by combining textual content with *social* and *thread* graphs, and show that adding the social network and thread structure beats text‑only baselines. [aclanthology](https://aclanthology.org/2020.lrec-1.167/)
+
+**Signals to adopt from these:**
+
+- Node definitions:
+  - employees (internal addresses)
+  - possibly external client entities (collapsed by domain or CRM id)
+- Edge construction:
+  - Directed: sender → recipient
+  - Options for multi‑recipient emails:
+    - hyperedge / simplex (like the Enron temporal simplicial dataset) [cs.cornell](https://www.cs.cornell.edu/~arb/data/email-Enron/)
+    - or projected weighted edges between all pairs in the email
+- Edge weights:
+  - frequency (count of emails)
+  - recency (e.g., exponential decay on timestamp)
+  - directionality (in/out asymmetry)
+  - thread participation (same `Message-ID` / `In-Reply-To`)
+- Thresholds:
+  - minimum #emails for an edge (tune via Enron‑style experiments; see ) [arxiv](https://arxiv.org/pdf/2407.21063.pdf)
+
+You can explicitly validate all your structural choices on Enron before touching a real org.
+
+***
+
+## 2. Node Criticality, “Dead Man Switch”, and Resilience
+
+### 2.1 Optimal percolation / network dismantling
+
+Two complementary works give you **state‑of‑the‑art node removal strategies**:
+
+1. **Optimal percolation / Collective Influence (CI)** – Morone & Makse, *Nature* 2015 [alphaxiv](https://www.alphaxiv.org/overview/1506.08326v1)
+   - Maps influence maximization (or minimal immunization) onto *optimal percolation*.
+   - Introduces the **Collective Influence** score  
+     \(\text{CI}_\ell(i) = (k_i - 1)\sum_{j \in \partial B(i,\ell)}(k_j - 1)\)  
+     where \(k_i\) is degree and \(\partial B(i,\ell)\) is the frontier at radius \(\ell\). [alphaxiv](https://www.alphaxiv.org/overview/1506.08326v1)
+   - Adaptive greedy removal of highest‑CI nodes fragments the network more efficiently than degree, PageRank, or k‑core for large graphs.
+
+2. **Network dismantling via Min‑Sum message passing** – Braunstein et al., *PNAS* 2016 [pnas](https://www.pnas.org/doi/10.1073/pnas.1605083113)
+   - Formalizes the **dismantling number**: minimal fraction of nodes whose removal breaks the giant component into subextensive components.
+   - Shows equivalence between **decycling** and dismantling on light‑tailed random graphs and develops a **Min‑Sum (zero‑temp BP)** algorithm:
+     - Stage 1: Min‑Sum for decycling (linear in edges).
+     - Stage 2: Greedy tree‑breaking to ensure component size ≤ C.
+     - Stage 3: Reverse greedy node reinsertion for loopy real‑world graphs.
+   - Outperforms CI and eigenvector centrality on both random graphs and real networks while staying near theoretical optimum. [pnas](https://www.pnas.org/doi/10.1073/pnas.1605083113)
+
+**How to adapt this into a “dead man switch”:**
+
+- Let \(G\) be the employee communication network (internal or internal+clients).
+- Run a **dismantling algorithm** (CI or Min‑Sum) to obtain one or several *minimal dismantling sets* \(S^\*\).
+- For each node \(v\):
+  - Define **criticality**: probability \(v \in S^\*\) across multiple runs with different tie‑breaking (Braunstein et al. show how to get these frequencies). [pnas](https://www.pnas.org/doi/10.1073/pnas.1605083113)
+  - Low‑criticality nodes are those whose removal barely affects the network’s connectivity—your firing candidates.
+- For an operational metric:
+  - For each employee \(v\): measure relative drop in size of giant component, or in global efficiency, under removal of \(v\) and its edges.
+    - Efficiency \(E(G) = \frac{1}{N(N-1)}\sum_{i\ne j}1/d_{ij}\).
+  - **Dead‑man‑switch score**:  
+    \(D(v) = \Delta E / E + \lambda \cdot \Delta |GC|\)  
+    (smaller is safer; large negative ∆ means big systemic impact).
+
+This gives you a theoretically grounded, non‑heuristic basis for “who can we remove with minimal damage”.
+
+### 2.2 Structural holes, brokers, and resilience indices
+
+**Structural holes / brokerage**
+
+- Burt’s work (e.g., “Measuring Access to Structural Holes” appendix) and reviews on structural holes in SNA formalize: [ronaldsburt](http://www.ronaldsburt.com/research/files/NNappB.pdf)
+  - **Constraint**, **effective size**, and **betweenness** as measures of how much someone brokers across otherwise disconnected groups.
+  - These brokers are empirically associated with promotions and performance in organizations.
+
+**Organizational resilience graph: GRACE**
+
+- GRACE (Janzen et al., ER’23) builds a **knowledge graph of KPIs, business units (Scopes), and disruption scenarios**, then defines:
+  - Node types: KPI, DisruptionScenario, Scope.
+  - Edges linking disruptions ↔ KPIs ↔ Scopes with learned influence weights.
+  - ResilienceIndex at scope and organizational level from KPI metrics. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC11763835/)
+  - Uses **degree centrality over KPI‑Influence and KPI‑Correlation edges** to find “neuralgic points” whose disruption most harms resilience. [dfki](https://www.dfki.de/fileadmin/user_upload/import/13689_ER2023_Resilience_Assessment_(2).pdf)
+
+**How to repurpose for your email graph:**
+
+- Treat each employee as a node with attributes:
+  - betweenness, Burt’s constraint / effective size, eigenvector centrality.
+- Define a **ResilienceIndex per team**: e.g., expected loss in internal connectivity if all members of that team are removed with probability proportional to turnover.
+- Mark:
+  - high‑brokerage, low‑redundancy nodes as *single points of failure* (never fire casually).
+  - low‑brokerage, high‑redundancy nodes with low CI/Min‑Sum criticality as *safe removals*.
+
+You get a combination of **global dismantling theory** and **micro‑level brokerage theory**.
+
+***
+
+## 3. Graph Robustness Metrics You Can Steal
+
+Even without full IEEE access, the robustness literature gives a palette of metrics:
+
+- **Graph Metrics for Internet Robustness – A Survey** (Fabian, 2021) reviews robustness metrics for large networked systems. Typical families: [arxiv](http://arxiv.org/abs/2103.05554)
+  - Size of giant component under random vs targeted node removal.
+  - Average shortest path length / diameter before and after failures.
+  - Algebraic connectivity (Fiedler value), edge and vertex connectivity.
+  - Network efficiency and its degradation under attack.
+- Papers on exact or approximate network robustness (e.g. “Exact calculation of network robustness” 2019) and comparisons of robustness metrics (Alenazi et al. 2015) systematically contrast which metrics respond most to which structural failures. [ieeexplore.ieee](https://ieeexplore.ieee.org/document/7149007/)
+
+**For your company‑vitals dashboard, you can compute per‑company:**
+
+- **Robustness curve** \(R(p)\): fraction of nodes in the giant component after removing a fraction \(p\) of nodes according to:
+  - random
+  - degree
+  - betweenness
+  - CI or Min‑Sum score  
+  Plotting all four gives a “fragility signature” per org.
+
+- **Local robustness score per employee**: area under \(R(p)\) when that employee is prioritized for removal vs when they’re at the back of the queue (compare as delta).
+
+These are all classical metrics, but no consultancy will be computing Min‑Sum or CI on email graphs.
+
+***
+
+## 4. Communication Waste / Overload and “Digital Waste”
+
+### 4.1 Empirical ONA patterns: overload, silos, rigidity
+
+Haemers’ ONA case study in a large telco defines three concrete use‑cases and associated metrics. [essay.utwente](https://essay.utwente.nl/fileshare/file/87902/Haemers_MA_EEMCS.pdf)
+
+- **Workload balance**
+  - Workweek span (first activity to last) > 50h → high‑risk groups.
+  - Collaboration hours vs focus hours: heavy meetings + emails → overload.
+- **Collaboration overload**
+  - **Generated collaboration**: hours others spend in meetings or emails initiated by this person.
+  - **Received collaboration**: hours this person spends responding to others.
+  - Strong Pareto effect: ~10–20% of people generate majority of collaboration load.
+- **Rigidity & silos**
+  - Network size: # of distinct collaborators.
+  - Network breadth: # of distinct teams interacted with.
+  - Silos = teams with low breadth and low size.
+
+There is also work specifically on collaboration overload and peripheral nodes in ONA (Cross et al., summarized in Haemers’ literature review). [essay.utwente](https://essay.utwente.nl/fileshare/file/87902/Haemers_MA_EEMCS.pdf)
+
+**Signals you can extract right away:**
+
+- Individual‑level:
+  - `collab_hours` (meetings+email), `focus_hours`, `after_hours`.
+  - `generated_collab` / `received_collab`.
+- Graph‑level:
+  - local clustering by org unit → too tightly knit silo.
+  - ratio of intra‑team to inter‑team edges.
+
+### 4.2 Turning that into graph‑theoretic “waste” metrics
+
+There is not yet a canonical “communication waste” metric on graphs, but you can ground proposals in:
+
+- **Network efficiency / redundancy** (from robustness literature). [arxiv](http://arxiv.org/abs/2103.05554)
+- **Digital waste / email overload** empirical literature (mostly management science and HCI), plus email overload statistics. [getinboxzero](https://www.getinboxzero.com/blog/post/how-to-reduce-email-overload-in-organizations)
+
+A plausible **waste index per edge**:
+
+- Define per‑edge features from email logs:
+  - ratio of “FYI” / broadcast messages (subject/body patterns, large CC lists).
+  - average thread length where no decision or artifact is produced (detect via topic modeling + entity extraction).
+  - whether the edge mostly carries low‑sentiment‑magnitude content (neutral chatter).
+
+Then define:
+
+- **Edge waste score**  
+  \(W_{ij} = \alpha \cdot \text{reply\_all\_storms}_{ij} + \beta \cdot \text{low\_info\_threads}_{ij} + \gamma \cdot \text{redundant\_CC}_{ij}\)
+
+Aggregate to:
+
+- **Node waste score**: \(W_i = \sum_j W_{ij}\).
+- **Network waste factor**: \(\sum_{(i,j)} W_{ij} / |E|\).
+
+You can validate this semi‑supervised:
+- Label some high‑waste vs low‑waste threads via human annotators.
+- Train a simple classifier on local graph + text features; see §6 for GNN ideas.
+
+***
+
+## 5. Comparing Actual vs “Ideal” Networks via Generative Models
+
+Here you can lean on **stochastic block models (SBM)** and **latent position models**:
+
+- Robin’s lecture notes on stochastic block models (SBM) and latent space models show how to model heterogeneous networks as a set of latent groups with block‑specific connection probabilities. [complexnetworks](http://www.complexnetworks.fr/wp-content/uploads/2015/03/stephane_robin.pdf)
+- Kaur (2023) and Sosa (2021) review latent position models and latent space models for social networks. [arxiv](https://arxiv.org/pdf/2304.02979.pdf)
+
+**Technique: learn an “ideal” role‑based template**
+
+1. For a set of high‑performing teams (or multiple companies, if you ever get that data), fit a **degree‑corrected SBM** over employee roles:
+   - Blocks = roles (e.g., `IC_engineer`, `manager`, `sales`, `CSM`, `C-suite`).
+   - Parameters: \(p_{ab}\) = probability of an edge from role a to role b, maybe conditioned on hierarchy distance.
+2. In your target org:
+   - Compute the **likelihood** of the observed graph under that SBM.
+   - For each node i, compute its **role‑fit score**:
+     - expected vs observed degree pattern across role blocks.
+
+3. Deviations:
+   - Under‑connected to clients for a `sales` block?
+   - Too much lateral IC‑to‑IC traffic, not enough upward feedback?
+
+This is fully statistically grounded and far beyond typical ONA dashboards.
+
+***
+
+## 6. Sentiment & Content‑Aware Graph Techniques
+
+You have two layers: *email‑level sentiment models*, and *graph‑level learning that uses sentiment/text as features*.
+
+### 6.1 Email‑level sentiment, threads, and sequences
+
+Relevant email‑specific work:
+
+- **Email thread sentiment sequences** (2022): uses SentiWordNet to compute sentiment features and PLSA clustering to group email threads; analyzes **sentiment polarity sequences and thread sizes**. [sciencedirect](https://www.sciencedirect.com/science/article/abs/pii/S0957417421017553)
+- **Document‑level sentiment analysis of email data** (Liu, 2020 PhD): proposes sequence‑encoded neural sentiment classification with **dependency‑graph‑based position encoding** and weighted sentiment features, including **sentiment sequences within email documents**. [researchonline.jcu.edu](https://researchonline.jcu.edu.au/65310/1/JCU_65310_liu_s_thesis_2020.pdf)
+- **Network and Sentiment Analysis of Enron Emails** (Belay et al., 2024): builds an Enron communication graph, runs various centrality metrics, and uses TextBlob to track sentiment trends; finds that aggregated sentiment does not track financial decline, but shows how to combine network and sentiment analysis on a corporate email corpus. [arxiv](https://arxiv.org/pdf/2407.21063.pdf)
+
+These give you:
+
+- How to define **thread‑level sentiment trajectories**.
+- How to **encode syntax/structure with graphs** at document level.
+
+### 6.2 GNN‑based sentiment methods you can re‑use
+
+Surveys and core models:
+
+- **Survey: Sentiment analysis methods based on GNN** (Abedi Rad et al., 2023). [assets.researchsquare](https://assets.researchsquare.com/files/rs-3173515/v1/262284b6-fa1b-43cb-b8c1-68735157dc4e.pdf?c=1693525943)
+- **Survey: Integrating sentiment analysis with GNNs for stock prediction** (Das et al., 2024). [colab](https://colab.ws/articles/10.1016%2Fj.dajour.2024.100417)
+- **Multi‑level GNN for text sentiment analysis** (2021): constructs multi‑level graphs of words with local vs global connection windows and a scaled dot‑product attention message‑passing mechanism. [sciencedirect](https://www.sciencedirect.com/science/article/abs/pii/S0045790621001051)
+- **Improved GCN for emotion analysis in social media** (Khemani et al., 2025): uses PMI‑based word graphs and attention to focus on sentiment‑bearing words. [pmc.ncbi.nlm.nih](https://pmc.ncbi.nlm.nih.gov/articles/PMC12148580/)
+
+Common patterns:
+
+- Build a **heterogeneous graph**:
+  - Nodes: documents, users, aspects/keywords, sometimes words.
+  - Edges: user–document, word–document, user–user.
+- Use **GNN layers (GCN/GAT/GNN variants)** to propagate sentiment signals over this structure.
+- Integrate **edge attributes** (e.g., sentiment polarity, intensity) into message passing.
+
+**How to adapt this to organizational email:**
+
+Construct a multilayer graph:
+
+- Node types:
+  - Employee nodes.
+  - Email thread nodes.
+  - Client nodes.
+- Edge types:
+  - employee ↔ thread (participation, role: sender/recipient).
+  - employee ↔ employee (aggregated communication).
+  - employee ↔ client (external contacts).
+- Features:
+  - Thread node: sentiment vector over time, topic distribution, outcome label (if available: deal won/lost, escalated ticket, etc.).
+  - Employee node: aggregated sentiment sent/received, overload metrics.
+- Model:
+  - Use a **heterogeneous GNN** (e.g., Relational GCN) to predict:
+    - link‑level labels: “healthy vs risky relationship”, “wasteful vs productive thread”.
+    - node‑level labels: “overloaded broker”, “isolated at risk”, etc.
+
+This is exactly the structure used in stock‑prediction GNN+sentiment papers, just replacing stocks with employees/clients. [colab](https://colab.ws/articles/10.1016%2Fj.dajour.2024.100417)
+
+***
+
+## 7. Temporal Dynamics, Communication Patterns, and Performance
+
+You also mentioned tracking **client progress** and **trajectory of internal communication**.
+
+Relevant empirical work:
+
+- **Temporal Distance, Communication Patterns, and Task Performance in Teams** (Journal of MIS, 2015): [academia](https://www.academia.edu/96229997/Temporal_Distance_Communication_Patterns_and_Task_Performance_in_Teams)
+  - Analyzes temporal distance (time zone difference) and its effect on performance, mediated by **communication frequency** and **turn‑taking**.
+  - Distinguishes **conveyance** vs **convergence** communication, linking them to speed vs quality.
+
+- **The Effects of Temporal Distance on Intra‑Firm Communication** (Chauvin, HBS WP): [hbs](https://www.hbs.edu/ris/download.aspx?name=21-052.pdf)
+  - Uses detailed logs (calls, meetings, IMs, email) to show how **temporal distance reduces rich synchronous communication** and shifts patterns.
+
+From these you can extract **time‑series features**:
+
+- At dyad or subgraph level:
+  - Response latency distribution.
+  - Burstiness and regularity of communication.
+  - Turn‑taking symmetry (alternating vs one‑sided threads).
+- At client‑subgraph level:
+  - Sliding‑window density, reciprocity, and sentiment trend.
+
+You can then define:
+
+- **Client health index**:
+  - \(H_c(t) = f(\text{density}_c(t), \text{reciprocity}_c(t), \text{sentiment\_trend}_c(t), \text{latency}_c(t))\)
+
+Backed by team‑performance literature, you can justify using these as predictors of “account at risk”.
+
+***
+
+## 8. Concrete Signals & Metric Families to Track
+
+Given the above literature, here is a compact checklist of **innovative but computationally tractable** signals:
+
+### 8.1 Node‑level
+
+- Classical centrality:
+  - degree, betweenness, eigenvector, k‑core index.
+- Brokerage / structural holes:
+  - Burt’s **constraint** and **effective size**. [sciencedirect](https://www.sciencedirect.com/topics/computer-science/structural-hole)
+- Dismantling/robustness:
+  - CI score at radius ℓ (2–3) and/or Min‑Sum dismantling membership frequency. [alphaxiv](https://www.alphaxiv.org/overview/1506.08326v1)
+- Overload / waste:
+  - collaboration hours, generated vs received collaboration. [essay.utwente](https://essay.utwente.nl/fileshare/file/87902/Haemers_MA_EEMCS.pdf)
+  - reply‑all storm participation, proportion of low‑information threads.
+- Sentiment:
+  - mean and variance of sentiment sent vs received.
+  - asymmetry (do you mostly receive negative sentiment?).
+
+### 8.2 Edge‑ and dyad‑level
+
+- Weight decomposition:
+  - frequency, recency, mean sentiment, latency, reciprocity.
+- Stability:
+  - churn in communication patterns over time (do important ties suddenly drop?).
+- Waste:
+  - fraction of interactions in long, no‑outcome threads.
+  - average CC‑bloat, “FYI”‑only messages.
+
+### 8.3 Subgraph / team / client‑level
+
+- Density, clustering coefficient, assortativity (role mixing).
+- SBM / latent‑space **likelihood** vs an “ideal” model. [complexnetworks](http://www.complexnetworks.fr/wp-content/uploads/2015/03/stephane_robin.pdf)
+- Robustness curves under targeted removal (per §3).
+- ResilienceIndex‑style aggregation:
+  - Map KPI‑like node metrics (overload, sentiment balance, redundancy) into scope‑level indices, à la GRACE. [dfki](https://www.dfki.de/fileadmin/user_upload/import/13689_ER2023_Resilience_Assessment_(2).pdf)
+
+***
+
+## 9. LLM Integration Patterns
+
+Once you compute these metrics and time‑series, you essentially have a **knowledge graph of org health**:
+
+- Nodes: employees, teams, KPIs, clients, disruption scenarios.
+- Edges: communication, influence, risk links, causal hypotheses (e.g., “overload of X precedes drop in client Y health”).
+
+You can then:
+
+- Store raw stats + explanations as structured JSON.
+- Use a **GraphRAG‑style approach**:
+  - Given a question like “What happens if we fire Alice?”, retrieve:
+    - Alice’s criticality metrics (CI, betweenness, SBM fit).
+    - Subgraphs she sits in (teams, clients).
+  - Feed those into the LLM as grounded context.
+
+Microsoft’s Graph AI for Organizational Analytics shows that similar graph‑based org analytics are already used at enterprise scale; your differentiator is the **combination of dismantling theory, SBM templates, and sentiment‑aware GNNs**. [microsoft](https://www.microsoft.com/en-us/research/project/graph-ai-for-organizational-analytics/)
+
+***
+
+If you like, a next step could be:
+
+- design a **minimal reproducible pipeline on Enron**:
+  - implement CI + dismantling,
+  - couple it with thread‑level sentiment (TextBlob/BERT),
+  - run SBM to infer role‑like communities,
+  - and generate a small “vitals” report as a proof‑of‑concept.
