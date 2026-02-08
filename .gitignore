@@ -30,7 +30,7 @@ out/
 # Data & Output (large files)
 data/maildir/
 data/enron_mail_20150507.tar.gz
-backend/output/
+# backend/output/ — committed for deployment
 
 # ChromaDB
 chroma_data/

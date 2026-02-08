@@ -54,35 +54,37 @@ def retrieve_context(question: str, top_k: int = 15) -> str:
     """Retrieve relevant context for a question.
 
     Combines:
-    1. Relevant email chunks from ChromaDB
+    1. Relevant email chunks from ChromaDB (if available)
     2. Graph metrics for mentioned people
     3. Organization overview
     """
-    client = OpenAI()
-    collection = get_collection()
     graph_data = load_graph_data()
     metrics_data = load_metrics_data()
 
-    # 1. Embed question and query ChromaDB
-    q_response = client.embeddings.create(
-        model="text-embedding-3-large",
-        input=[question],
-    )
-    q_embedding = q_response.data[0].embedding
-
-    results = collection.query(
-        query_embeddings=[q_embedding],
-        n_results=top_k,
-    )
-
-    # Build email context
+    # 1. Try ChromaDB for email context, gracefully skip if unavailable
     email_context = "## Relevant Emails\n\n"
-    if results["documents"] and results["documents"][0]:
-        for i, (doc, meta) in enumerate(zip(results["documents"][0], results["metadatas"][0])):
-            email_context += f"**Email {i+1}** (From: {meta.get('sender', 'unknown')}, "
-            email_context += f"Date: {meta.get('date', 'unknown')}, "
-            email_context += f"Subject: {meta.get('subject', '')})\n"
-            email_context += f"{doc[:500]}\n\n"
+    try:
+        client = OpenAI()
+        collection = get_collection()
+        q_response = client.embeddings.create(
+            model="text-embedding-3-large",
+            input=[question],
+        )
+        q_embedding = q_response.data[0].embedding
+
+        results = collection.query(
+            query_embeddings=[q_embedding],
+            n_results=top_k,
+        )
+
+        if results["documents"] and results["documents"][0]:
+            for i, (doc, meta) in enumerate(zip(results["documents"][0], results["metadatas"][0])):
+                email_context += f"**Email {i+1}** (From: {meta.get('sender', 'unknown')}, "
+                email_context += f"Date: {meta.get('date', 'unknown')}, "
+                email_context += f"Subject: {meta.get('subject', '')})\n"
+                email_context += f"{doc[:500]}\n\n"
+    except Exception:
+        email_context += "(Email search unavailable — using graph and metrics context only)\n\n"
 
     # 2. Graph context for mentioned people
     mentioned = extract_mentioned_people(question, graph_data)
