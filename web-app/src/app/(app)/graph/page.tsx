@@ -36,6 +36,7 @@ export default function GraphPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const graphRef = useRef<any>(null);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     getGraph()
@@ -59,7 +60,7 @@ export default function GraphPage() {
         setTimeout(() => {
           if (graphRef.current && node.x !== undefined) {
             graphRef.current.centerAt(node.x, node.y, 500);
-            graphRef.current.zoom(3, 500);
+            graphRef.current.zoom(1.5, 500);
           }
         }, 300);
       }
@@ -79,6 +80,26 @@ export default function GraphPage() {
     return () => window.removeEventListener("resize", updateDimensions);
   }, [selectedNodeId]);
 
+  // Debounced search: zoom to matched node
+  useEffect(() => {
+    if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    if (!searchQuery) return;
+
+    searchDebounceRef.current = setTimeout(() => {
+      const node = nodes.find((n) =>
+        n.name.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+      if (node && graphRef.current && node.x !== undefined) {
+        graphRef.current.centerAt(node.x, node.y, 500);
+        graphRef.current.zoom(1.5, 500);
+      }
+    }, 300);
+
+    return () => {
+      if (searchDebounceRef.current) clearTimeout(searchDebounceRef.current);
+    };
+  }, [searchQuery, nodes]);
+
   const highlightedNodeId = searchQuery
     ? nodes.find((n) => n.name.toLowerCase().includes(searchQuery.toLowerCase()))?.id
     : null;
@@ -89,13 +110,22 @@ export default function GraphPage() {
     setSelectedNodeId(node.id);
     if (graphRef.current) {
       graphRef.current.centerAt(node.x, node.y, 500);
-      graphRef.current.zoom(3, 500);
+      graphRef.current.zoom(1.5, 500);
     }
   }, []);
 
   const handleBackgroundClick = useCallback(() => {
     setSelectedNodeId(null);
   }, []);
+
+  const handleSearchKeyDown = useCallback(
+    (e: React.KeyboardEvent<HTMLInputElement>) => {
+      if (e.key === "Enter" && highlightedNodeId) {
+        setSelectedNodeId(highlightedNodeId);
+      }
+    },
+    [highlightedNodeId]
+  );
 
   if (loading) {
     return (
@@ -115,7 +145,7 @@ export default function GraphPage() {
           nodeId="id"
           linkSource="source"
           linkTarget="target"
-          nodeLabel={(node: any) => `${node.name} (PR: ${node.pagerank.toFixed(4)})`}
+          nodeLabel={(node: any) => node.name}
           nodeVal={(node: any) => Math.max(2, (node.pagerank / maxPagerank) * 20)}
           nodeColor={(node: any) => {
             if (highlightedNodeId === node.id) return "#000000";
@@ -147,6 +177,7 @@ export default function GraphPage() {
                 placeholder="Search people..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={handleSearchKeyDown}
                 className="text-sm flex-1 outline-none bg-transparent"
               />
             </div>
