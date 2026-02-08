@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useCallback, useRef } from "react";
+import { Suspense, useEffect, useState, useCallback, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import { Search } from "lucide-react";
@@ -26,6 +26,20 @@ interface ForceNode extends GraphNode {
 }
 
 export default function GraphPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center h-[calc(100vh-3.5rem)]">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--foreground)]" />
+        </div>
+      }
+    >
+      <GraphPageInner />
+    </Suspense>
+  );
+}
+
+function GraphPageInner() {
   const searchParams = useSearchParams();
   const focusId = searchParams.get("focus");
 

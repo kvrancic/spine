@@ -95,7 +95,7 @@ vi.mock("@/lib/api", () => ({
         { label: "Fragmentation Sensitivity", description: "Removing the most critical node fragments 5.1% of the network", severity: "Critical", value: 5.1 },
       ],
       communication_waste: [
-        { id: "john.lavorato@enron.com", name: "John Lavorato", waste_score: 42.1, broadcast_ratio: 0.15, orphan_ratio: 0.22 },
+        { id: "john.lavorato@enron.com", name: "John Lavorato", waste_score: 42.1, overproduction: 3.2, reply_all_ratio: 0.15, response_gap: 0.22 },
       ],
     })
   ),
@@ -152,13 +152,15 @@ describe("People Page (Redesigned)", () => {
     expect(await screen.findByText("2 people")).toBeInTheDocument();
   });
 
-  it("has sort dropdown", async () => {
+  it("has sortable column headers", async () => {
     const { default: PeoplePage } = await import("@/app/(app)/people/page");
     render(React.createElement(PeoplePage));
 
     await screen.findByText("Sally Beck");
-    const select = screen.getByRole("combobox");
-    expect(select).toBeInTheDocument();
+    const headers = document.querySelectorAll("th");
+    const headerTexts = Array.from(headers).map((h) => h.textContent);
+    expect(headerTexts).toContain("PageRank");
+    expect(headerTexts).toContain("Risk Score");
   });
 });
 
