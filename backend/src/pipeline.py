@@ -14,6 +14,7 @@ from src.metrics.health import compute_health
 from src.metrics.waste import compute_waste
 from src.parser.email_parser import parse_all_emails
 from src.parser.enron_extractor import extract_enron, DEFAULT_ARCHIVE, DEFAULT_OUTPUT
+from src.analysis.role_inference import infer_role_snapshots
 from src.sentiment.analyzer import enrich_graph_with_sentiment, get_sentiment_summary
 
 
@@ -251,6 +252,13 @@ def run_pipeline(
             json.dump(person, f, default=json_serial, indent=2)
 
     print(f"  people/: {G.number_of_nodes()} person files")
+
+    # --- role_snapshots.json ---
+    print("  Computing role snapshots from email subjects...")
+    role_snapshots = infer_role_snapshots(emails, graph_data)
+    with open(output_dir / "role_snapshots.json", "w") as f:
+        json.dump(role_snapshots, f, indent=2)
+    print(f"  role_snapshots.json: {len(role_snapshots)} snapshots")
 
     elapsed = time.time() - start
     print(f"\n{'=' * 60}")

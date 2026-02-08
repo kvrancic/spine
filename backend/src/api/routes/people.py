@@ -23,10 +23,17 @@ _graph_data: dict | None = None
 _metrics_data: dict | None = None
 _people_dir: Path | None = None
 _community_labels: dict[int, str] = {}
+_role_snapshots: dict[str, str] = {}
 
 
-def init(graph_data: dict, metrics_data: dict, people_dir: Path, communities_data: dict | None = None):
-    global _graph_data, _metrics_data, _people_dir, _community_labels
+def init(
+    graph_data: dict,
+    metrics_data: dict,
+    people_dir: Path,
+    communities_data: dict | None = None,
+    role_snapshots: dict[str, str] | None = None,
+):
+    global _graph_data, _metrics_data, _people_dir, _community_labels, _role_snapshots
     _graph_data = graph_data
     _metrics_data = metrics_data
     _people_dir = people_dir
@@ -34,6 +41,8 @@ def init(graph_data: dict, metrics_data: dict, people_dir: Path, communities_dat
         for c in communities_data.get("communities", []):
             if "label" in c:
                 _community_labels[c["id"]] = c["label"]
+    if role_snapshots:
+        _role_snapshots = role_snapshots
 
 
 @router.get("", response_model=PeopleListResponse)
@@ -155,15 +164,18 @@ def get_person_panel(person_id: str):
     in_deg = node.get("in_degree_centrality", 0)
     out_deg = node.get("out_degree_centrality", 0)
 
-    # Role snapshot
+    # Role snapshot — use pre-computed email-inferred snapshot if available
     community_id = node.get("community_id", 0)
     community_label = _community_labels.get(community_id, f"Community {community_id}")
-    centrality_rank_label = "high" if betweenness > 0.01 else "moderate" if betweenness > 0.001 else "low"
-    role_snapshot = (
-        f"Member of {community_label} with {centrality_rank_label} centrality. "
-        f"Sends {total_sent} and receives {total_received} emails. "
-        f"Acts as a {'key connector' if betweenness > 0.005 else 'regular participant'} in the network."
-    )
+    if person_id in _role_snapshots:
+        role_snapshot = _role_snapshots[person_id]
+    else:
+        centrality_rank_label = "high" if betweenness > 0.01 else "moderate" if betweenness > 0.001 else "low"
+        role_snapshot = (
+            f"Member of {community_label} with {centrality_rank_label} centrality. "
+            f"Sends {total_sent} and receives {total_received} emails. "
+            f"Acts as a {'key connector' if betweenness > 0.005 else 'regular participant'} in the network."
+        )
 
     # Workstreams (mock)
     ws_labels = ["Operations", "Strategy", "Compliance", "Client Relations",

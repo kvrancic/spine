@@ -20,6 +20,7 @@ def load_data():
     graph_path = OUTPUT_DIR / "graph.json"
     metrics_path = OUTPUT_DIR / "metrics.json"
     communities_path = OUTPUT_DIR / "communities.json"
+    role_snapshots_path = OUTPUT_DIR / "role_snapshots.json"
     people_dir = OUTPUT_DIR / "people"
 
     if not graph_path.exists():
@@ -36,10 +37,15 @@ def load_data():
     with open(communities_path) as f:
         communities_data = json.load(f)
 
+    role_snapshots: dict[str, str] = {}
+    if role_snapshots_path.exists():
+        with open(role_snapshots_path) as f:
+            role_snapshots = json.load(f)
+
     # Initialize route modules with data
     graph.init(graph_data, communities_data)
     metrics.init(metrics_data, communities_data, graph_data)
-    people.init(graph_data, metrics_data, people_dir, communities_data)
+    people.init(graph_data, metrics_data, people_dir, communities_data, role_snapshots)
     trends.init(graph_data, metrics_data, communities_data)
     risks.init(graph_data, metrics_data)
 
