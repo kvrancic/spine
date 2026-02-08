@@ -4,10 +4,13 @@ import json
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from src.api.routes import chat, graph, metrics, people, reports
+
+load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
 OUTPUT_DIR = Path(__file__).resolve().parents[2] / "output"
 
