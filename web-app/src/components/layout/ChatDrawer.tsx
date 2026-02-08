@@ -151,7 +151,7 @@ export default function ChatDrawer({
                             : "bg-gray-100"
                         }`}
                       >
-                        <div className="prose prose-sm max-w-none">
+                        <div className="prose prose-sm max-w-none prose-headings:font-semibold prose-headings:mt-2 prose-headings:mb-1 prose-p:my-1 prose-ul:my-1 prose-li:my-0">
                           {msg.content ? (
                             msg.role === "assistant" ? (
                               <Markdown>{msg.content}</Markdown>
