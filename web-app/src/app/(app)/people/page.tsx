@@ -2,29 +2,30 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowUpDown, AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
+import { Search, ChevronUp, ChevronDown, AlertCircle, AlertTriangle, CheckCircle } from "lucide-react";
 import { getPeople } from "@/lib/api";
 import type { PersonSummary } from "@/lib/types";
 
-type SortKey = "name" | "betweenness" | "pagerank" | "dms_score" | "total_sent" | "total_received" | "eigenvector";
+type SortKey = "name" | "betweenness" | "pagerank" | "eigenvector" | "dms_score" | "total_sent" | "total_received";
 
-const SORT_OPTIONS: { value: SortKey; label: string }[] = [
-  { value: "betweenness", label: "Betweenness" },
-  { value: "pagerank", label: "PageRank" },
-  { value: "eigenvector", label: "Eigenvector" },
-  { value: "dms_score", label: "High Risk Score" },
-  { value: "total_sent", label: "Emails Sent" },
-  { value: "total_received", label: "Emails Received" },
+const COLUMNS: { key: SortKey; label: string; align?: string }[] = [
+  { key: "name", label: "Name" },
+  { key: "pagerank", label: "PageRank" },
+  { key: "betweenness", label: "Betweenness" },
+  { key: "eigenvector", label: "Eigenvector" },
+  { key: "total_sent", label: "Sent" },
+  { key: "total_received", label: "Received" },
+  { key: "dms_score", label: "Risk Score" },
 ];
 
 function AlertIcon({ dmsScore, allScores }: { dmsScore: number; allScores: number[] }) {
   if (allScores.length === 0) return null;
   const sorted = [...allScores].sort((a, b) => b - a);
-  const top10 = sorted[Math.floor(sorted.length * 0.1)] ?? 0;
-  const top30 = sorted[Math.floor(sorted.length * 0.3)] ?? 0;
+  const top5 = sorted[Math.floor(sorted.length * 0.05)] ?? 0;
+  const top15 = sorted[Math.floor(sorted.length * 0.15)] ?? 0;
 
-  if (dmsScore >= top10) return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
-  if (dmsScore >= top30) return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />;
+  if (dmsScore >= top5) return <AlertCircle className="w-3.5 h-3.5 text-red-500" />;
+  if (dmsScore >= top15) return <AlertTriangle className="w-3.5 h-3.5 text-yellow-500" />;
   return <CheckCircle className="w-3.5 h-3.5 text-green-500" />;
 }
 
@@ -34,6 +35,7 @@ export default function PeoplePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState("");
   const [sortKey, setSortKey] = useState<SortKey>("betweenness");
+  const [sortAsc, setSortAsc] = useState(false);
   const [page, setPage] = useState(1);
   const pageSize = 50;
 
@@ -51,6 +53,15 @@ export default function PeoplePage() {
 
   const allDmsScores = people.map((p) => p.dms_score);
 
+  const handleSort = (key: SortKey) => {
+    if (sortKey === key) {
+      setSortAsc(!sortAsc);
+    } else {
+      setSortKey(key);
+      setSortAsc(key === "name");
+    }
+  };
+
   const filtered = people
     .filter(
       (p) =>
@@ -58,8 +69,9 @@ export default function PeoplePage() {
         p.email.toLowerCase().includes(search.toLowerCase())
     )
     .sort((a, b) => {
-      if (sortKey === "name") return a.name.localeCompare(b.name);
-      return (b[sortKey] as number) - (a[sortKey] as number);
+      const dir = sortAsc ? 1 : -1;
+      if (sortKey === "name") return a.name.localeCompare(b.name) * dir;
+      return ((a[sortKey] as number) - (b[sortKey] as number)) * dir;
     });
 
   const displayed = filtered.slice(0, page * pageSize);
@@ -89,22 +101,6 @@ export default function PeoplePage() {
             className="text-sm flex-1 outline-none bg-transparent"
           />
         </div>
-
-        <div className="flex items-center gap-2">
-          <ArrowUpDown className="w-4 h-4 text-[var(--muted)]" />
-          <select
-            value={sortKey}
-            onChange={(e) => setSortKey(e.target.value as SortKey)}
-            className="text-sm border border-[var(--card-border)] rounded-lg px-3 py-2 bg-white outline-none"
-          >
-            {SORT_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </div>
-
         <span className="text-sm text-[var(--muted)]">{filtered.length} people</span>
       </div>
 
@@ -114,11 +110,31 @@ export default function PeoplePage() {
           <table className="w-full">
             <thead>
               <tr className="border-b border-[var(--card-border)]">
-                <th className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3">Name</th>
+                {/* Name column (no sort icon for email sub-column) */}
+                <th
+                  className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3 cursor-pointer hover:text-[var(--foreground)] select-none"
+                  onClick={() => handleSort("name")}
+                >
+                  <span className="inline-flex items-center gap-1">
+                    Name
+                    {sortKey === "name" && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                  </span>
+                </th>
                 <th className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3">Email</th>
                 <th className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3">Since</th>
                 <th className="text-center text-xs font-medium text-[var(--muted)] px-4 py-3">Alert</th>
-                <th className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3">Betweenness</th>
+                {COLUMNS.filter((c) => c.key !== "name").map((col) => (
+                  <th
+                    key={col.key}
+                    className="text-left text-xs font-medium text-[var(--muted)] px-4 py-3 cursor-pointer hover:text-[var(--foreground)] select-none"
+                    onClick={() => handleSort(col.key)}
+                  >
+                    <span className="inline-flex items-center gap-1">
+                      {col.label}
+                      {sortKey === col.key && (sortAsc ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />)}
+                    </span>
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
@@ -132,11 +148,16 @@ export default function PeoplePage() {
                 >
                   <td className="px-4 py-3 text-sm font-medium">{person.name}</td>
                   <td className="px-4 py-3 text-sm text-[var(--muted)]">{person.email}</td>
-                  <td className="px-4 py-3 text-sm text-[var(--muted)]">--</td>
+                  <td className="px-4 py-3 text-sm text-[var(--muted)]">{person.first_seen || "--"}</td>
                   <td className="px-4 py-3 text-center">
                     <AlertIcon dmsScore={person.dms_score} allScores={allDmsScores} />
                   </td>
+                  <td className="px-4 py-3 text-sm font-mono">{person.pagerank.toFixed(5)}</td>
                   <td className="px-4 py-3 text-sm font-mono">{person.betweenness.toFixed(5)}</td>
+                  <td className="px-4 py-3 text-sm font-mono">{person.eigenvector.toFixed(5)}</td>
+                  <td className="px-4 py-3 text-sm font-mono">{person.total_sent}</td>
+                  <td className="px-4 py-3 text-sm font-mono">{person.total_received}</td>
+                  <td className="px-4 py-3 text-sm font-mono">{person.dms_score.toFixed(3)}</td>
                 </tr>
               ))}
             </tbody>

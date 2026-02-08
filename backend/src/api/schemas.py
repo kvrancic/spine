@@ -141,6 +141,7 @@ class PersonSummary(BaseModel):
     avg_sent_sentiment: float = 0
     dms_score: float = 0
     waste_score: float = 0
+    first_seen: str | None = None
 
 
 class PeopleListResponse(BaseModel):

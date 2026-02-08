@@ -128,6 +128,7 @@ export interface PersonSummary {
   avg_sent_sentiment: number;
   dms_score: number;
   waste_score: number;
+  first_seen: string | null;
 }
 
 export interface ConnectionDetail {

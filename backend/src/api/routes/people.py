@@ -53,8 +53,29 @@ def get_people():
     dms_map = {d["id"]: d.get("dms_score", 0) for d in _metrics_data.get("dead_man_switch", [])}
     waste_map = {w["id"]: w.get("waste_score", 0) for w in _metrics_data.get("waste", [])}
 
+    # Build first_seen lookup from edges
+    first_seen_map: dict[str, str] = {}
+    for e in _graph_data.get("edges", []):
+        fe = e.get("first_email")
+        if not fe:
+            continue
+        for pid in (e["source"], e["target"]):
+            if pid not in first_seen_map or fe < first_seen_map[pid]:
+                first_seen_map[pid] = fe
+
     people = []
     for n in _graph_data["nodes"]:
+        fs = first_seen_map.get(n["id"])
+        # Format as "Jan 2000" style
+        first_seen = None
+        if fs:
+            try:
+                from datetime import datetime
+                dt = datetime.fromisoformat(fs.replace("Z", "+00:00"))
+                first_seen = dt.strftime("%b %Y")
+            except Exception:
+                first_seen = fs[:10] if len(fs) >= 10 else fs
+
         people.append(PersonSummary(
             id=n["id"],
             name=n["name"],
@@ -68,6 +89,7 @@ def get_people():
             avg_sent_sentiment=n.get("avg_sent_sentiment", 0),
             dms_score=dms_map.get(n["id"], 0),
             waste_score=waste_map.get(n["id"], 0),
+            first_seen=first_seen,
         ))
 
     return PeopleListResponse(people=people)
