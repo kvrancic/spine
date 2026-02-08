@@ -1,4 +1,4 @@
-# OrgVitals — AI-Powered Organizational Intelligence Platform
+# Spine — AI-Powered Organizational Intelligence Platform
 
 **Instant graph-based diagnostics from email communication data.**
 
