@@ -30,6 +30,7 @@ export default function GraphPage() {
   const [selectedNode, setSelectedNode] = useState<ForceNode | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [edgeThreshold, setEdgeThreshold] = useState(0);
+  const [dimensions, setDimensions] = useState({ width: 800, height: 600 });
   const graphRef = useRef<any>(null);
 
   useEffect(() => {
@@ -42,6 +43,18 @@ export default function GraphPage() {
       setLoading(false);
     });
   }, []);
+
+  useEffect(() => {
+    const updateDimensions = () => {
+      setDimensions({
+        width: window.innerWidth - 240 - (selectedNode ? 320 : 0),
+        height: window.innerHeight - 56,
+      });
+    };
+    updateDimensions();
+    window.addEventListener("resize", updateDimensions);
+    return () => window.removeEventListener("resize", updateDimensions);
+  }, [selectedNode]);
 
   const filteredEdges = edges.filter(e => e.weight >= edgeThreshold);
   const connectedNodeIds = new Set<string>();
@@ -88,7 +101,7 @@ export default function GraphPage() {
           nodeColor={(node: any) => {
             if (highlightedNodeId === node.id) return "#000000";
             if (selectedNode?.id === node.id) return "#000000";
-            return COMMUNITY_COLORS[node.community_id % COMMUNITY_COLORS.length] || "#6b7280";
+            return COMMUNITY_COLORS[(node.community_id ?? 0) % COMMUNITY_COLORS.length] || "#6b7280";
           }}
           linkWidth={(link: any) => Math.max(0.3, link.weight * 3)}
           linkColor={(link: any) => {
@@ -100,8 +113,8 @@ export default function GraphPage() {
           linkDirectionalArrowRelPos={1}
           onNodeClick={handleNodeClick}
           backgroundColor="#f9fafb"
-          width={typeof window !== "undefined" ? window.innerWidth - 240 - (selectedNode ? 320 : 0) : 800}
-          height={typeof window !== "undefined" ? window.innerHeight - 56 : 600}
+          width={dimensions.width}
+          height={dimensions.height}
         />
 
         {/* Controls overlay */}

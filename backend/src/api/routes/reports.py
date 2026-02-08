@@ -90,5 +90,8 @@ async def health_report():
             "content": "\n".join(current_content).strip(),
         })
 
+    # Filter out sections with empty content (e.g. top-level title headings)
+    sections = [s for s in sections if s["content"]]
+
     _report_cache["health"] = sections
     return {"report": sections}

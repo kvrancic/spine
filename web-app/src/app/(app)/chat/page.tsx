@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Send, Sparkles } from "lucide-react";
+import Markdown from "react-markdown";
 import { streamChat } from "@/lib/api";
 import type { ChatMessage } from "@/lib/types";
 
@@ -105,8 +106,14 @@ export default function ChatPage() {
                       : "bg-white border border-[var(--card-border)]"
                   }`}
                 >
-                  <div className="whitespace-pre-wrap prose prose-sm max-w-none">
-                    {msg.content || (streaming && i === messages.length - 1 ? (
+                  <div className="prose prose-sm max-w-none">
+                    {msg.content ? (
+                      msg.role === "assistant" ? (
+                        <Markdown>{msg.content}</Markdown>
+                      ) : (
+                        <span className="whitespace-pre-wrap">{msg.content}</span>
+                      )
+                    ) : (streaming && i === messages.length - 1 ? (
                       <span className="inline-block w-2 h-4 bg-[var(--accent)] animate-pulse" />
                     ) : null)}
                   </div>

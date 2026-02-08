@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { FileText, Loader2 } from "lucide-react";
 import { motion } from "framer-motion";
+import Markdown from "react-markdown";
 import { getHealthReport } from "@/lib/api";
 import type { ReportSection } from "@/lib/types";
 
@@ -87,8 +88,8 @@ export default function ReportsPage() {
             transition={{ delay: i * 0.05 }}
           >
             <h3 className="text-lg font-semibold mb-3">{section.title}</h3>
-            <div className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap prose prose-sm max-w-none">
-              {section.content}
+            <div className="text-sm text-gray-700 leading-relaxed prose prose-sm max-w-none">
+              <Markdown>{section.content}</Markdown>
             </div>
           </motion.div>
         ))}

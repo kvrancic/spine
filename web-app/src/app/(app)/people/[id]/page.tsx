@@ -114,10 +114,10 @@ export default function PersonPage() {
             </span>
           </h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <WasteStat label="Overproduction" value={waste.overproduction?.toFixed(2)} />
-            <WasteStat label="Broadcast Ratio" value={(waste.broadcast_ratio * 100)?.toFixed(1) + "%"} />
-            <WasteStat label="Reply-All Ratio" value={(waste.reply_all_ratio * 100)?.toFixed(1) + "%"} />
-            <WasteStat label="Orphan Ratio" value={(waste.orphan_ratio * 100)?.toFixed(1) + "%"} />
+            <WasteStat label="Overproduction" value={waste.overproduction?.toFixed(2) ?? "N/A"} />
+            <WasteStat label="Broadcast Ratio" value={waste.broadcast_ratio != null ? (waste.broadcast_ratio * 100).toFixed(1) + "%" : "N/A"} />
+            <WasteStat label="Reply-All Ratio" value={waste.reply_all_ratio != null ? (waste.reply_all_ratio * 100).toFixed(1) + "%" : "N/A"} />
+            <WasteStat label="Orphan Ratio" value={waste.orphan_ratio != null ? (waste.orphan_ratio * 100).toFixed(1) + "%" : "N/A"} />
           </div>
         </div>
       )}
