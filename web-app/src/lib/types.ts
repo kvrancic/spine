@@ -169,3 +169,83 @@ export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
 }
+
+export type AlertTier = "critical" | "warning" | "healthy";
+
+export interface Workstream {
+  label: string;
+  percent: number;
+}
+
+export interface PersonPanel {
+  id: string;
+  name: string;
+  email: string;
+  community_id: number | null;
+  alert_tier: AlertTier;
+  since: string | null;
+  role_snapshot: string;
+  workstreams: Workstream[];
+  emails_per_day: number;
+  in_pct: number;
+  out_pct: number;
+  median_response_time_hrs: number;
+  after_hours_activity: string;
+  betweenness: number;
+  spof_risk: string;
+  removal_impact_lcc_pct: number;
+  removal_impact_avg_path_pct: number;
+  in_degree_bin: string;
+  out_degree_bin: string;
+  response_latency: string;
+  volume_delta_pct: number;
+  new_topic: string | null;
+  diversity_delta_pct: number;
+  peer_rank: number;
+  peer_total: number;
+  likely_backups: string[];
+}
+
+export interface TrendItem {
+  person_id: string;
+  person_name: string;
+  metric: string;
+  value: number;
+  delta_pct: number;
+}
+
+export interface TrendsData {
+  structural_shifts: TrendItem[];
+  communication_shifts: TrendItem[];
+  workstream_shifts: TrendItem[];
+}
+
+export interface HighRiskNode {
+  id: string;
+  name: string;
+  risk_score: number;
+  risk_label: string;
+  key_vulnerability: string;
+  impact_pct: number;
+}
+
+export interface StructuralRisk {
+  label: string;
+  description: string;
+  severity: string;
+  value: number;
+}
+
+export interface WasteOffender {
+  id: string;
+  name: string;
+  waste_score: number;
+  broadcast_ratio: number;
+  orphan_ratio: number;
+}
+
+export interface RisksData {
+  high_risk_nodes: HighRiskNode[];
+  structural_risks: StructuralRisk[];
+  communication_waste: WasteOffender[];
+}

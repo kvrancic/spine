@@ -1,20 +1,23 @@
-import Sidebar from "@/components/layout/Sidebar";
-import Header from "@/components/layout/Header";
+"use client";
+
+import { useState } from "react";
+import TopNav from "@/components/layout/TopNav";
+import ChatDrawer from "@/components/layout/ChatDrawer";
 
 export default function AppLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const [chatOpen, setChatOpen] = useState(false);
+
   return (
-    <div className="flex h-screen overflow-hidden">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-y-auto p-6 bg-[var(--background)]">
-          {children}
-        </main>
-      </div>
+    <div className="min-h-screen">
+      <TopNav onChatToggle={() => setChatOpen((prev) => !prev)} />
+      <main className="pt-14 bg-[var(--background)]">
+        {children}
+      </main>
+      <ChatDrawer open={chatOpen} onClose={() => setChatOpen(false)} />
     </div>
   );
 }

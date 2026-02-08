@@ -1,11 +1,11 @@
 /**
- * Step 12 Tests: Frontend — Reports & Upload Pages
+ * Tests: Reports Page & Landing Page (redesigned)
  *
  * Verifies:
  * - Reports page renders with generate button
- * - Landing page renders with upload area
- * - Fake processing animation elements exist
- * - Reports display after generation
+ * - Landing page renders Spine branding + shader
+ * - Upload card on landing page
+ * - Processing animation
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -24,6 +24,15 @@ vi.mock("next/link", () => ({
     React.createElement("a", { href, ...props }, children),
 }));
 
+// Mock next/dynamic (for ShaderAnimation)
+vi.mock("next/dynamic", () => ({
+  default: () => {
+    return function MockShader() {
+      return React.createElement("div", { "data-testid": "shader-animation" }, "Shader");
+    };
+  },
+}));
+
 // Mock framer-motion
 vi.mock("framer-motion", () => ({
   motion: {
@@ -33,10 +42,14 @@ vi.mock("framer-motion", () => ({
     },
   },
   AnimatePresence: ({ children }: any) => {
-    // AnimatePresence shows the first child
     const child = Array.isArray(children) ? children.find(Boolean) : children;
     return child;
   },
+}));
+
+// Mock react-markdown
+vi.mock("react-markdown", () => ({
+  default: ({ children }: any) => React.createElement("div", null, children),
 }));
 
 // Mock API
@@ -52,160 +65,113 @@ vi.mock("@/lib/api", () => ({
   ),
 }));
 
-describe("Step 12: Reports & Upload Pages", () => {
-  describe("Reports Page", () => {
-    it("renders the generate report button", async () => {
-      const { default: ReportsPage } = await import(
-        "@/app/(app)/reports/page"
-      );
-      render(React.createElement(ReportsPage));
+describe("Reports Page", () => {
+  it("renders the generate report button", async () => {
+    const { default: ReportsPage } = await import("@/app/(app)/reports/page");
+    render(React.createElement(ReportsPage));
 
-      expect(screen.getByText("Generate Report")).toBeInTheDocument();
+    expect(screen.getByText("Generate Report")).toBeInTheDocument();
+  });
+
+  it("renders the report description", async () => {
+    const { default: ReportsPage } = await import("@/app/(app)/reports/page");
+    render(React.createElement(ReportsPage));
+
+    expect(screen.getByText("Organizational Health Report")).toBeInTheDocument();
+    expect(screen.getByText(/comprehensive diagnostic report/)).toBeInTheDocument();
+  });
+
+  it("shows loading state when generating", async () => {
+    const { default: ReportsPage } = await import("@/app/(app)/reports/page");
+    render(React.createElement(ReportsPage));
+
+    const button = screen.getByText("Generate Report");
+    fireEvent.click(button);
+
+    expect(screen.getByText("Generating report...")).toBeInTheDocument();
+  });
+
+  it("displays report sections after generation", async () => {
+    const { default: ReportsPage } = await import("@/app/(app)/reports/page");
+    render(React.createElement(ReportsPage));
+
+    const button = screen.getByText("Generate Report");
+    fireEvent.click(button);
+
+    await waitFor(() => {
+      expect(screen.getByText("Executive Summary")).toBeInTheDocument();
     });
 
-    it("renders the report description", async () => {
-      const { default: ReportsPage } = await import(
-        "@/app/(app)/reports/page"
-      );
-      render(React.createElement(ReportsPage));
+    expect(screen.getByText("Critical Personnel")).toBeInTheDocument();
+    expect(screen.getByText("Communication Structure")).toBeInTheDocument();
+  });
 
-      expect(
-        screen.getByText("Organizational Health Report")
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/comprehensive diagnostic report/)
-      ).toBeInTheDocument();
+  it("shows print button after report is generated", async () => {
+    const { default: ReportsPage } = await import("@/app/(app)/reports/page");
+    render(React.createElement(ReportsPage));
+
+    fireEvent.click(screen.getByText("Generate Report"));
+
+    await waitFor(() => {
+      expect(screen.getByText("Print / Save PDF")).toBeInTheDocument();
     });
+  });
+});
 
-    it("shows loading state when generating", async () => {
-      const { default: ReportsPage } = await import(
-        "@/app/(app)/reports/page"
-      );
-      render(React.createElement(ReportsPage));
+describe("Landing Page (Redesigned)", () => {
+  it("renders Spine branding", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-      const button = screen.getByText("Generate Report");
-      fireEvent.click(button);
+    expect(screen.getByText("Spine")).toBeInTheDocument();
+  });
 
-      expect(screen.getByText("Generating report...")).toBeInTheDocument();
-    });
+  it("renders upload card", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-    it("displays report sections after generation", async () => {
-      const { default: ReportsPage } = await import(
-        "@/app/(app)/reports/page"
-      );
-      render(React.createElement(ReportsPage));
+    expect(screen.getByText("Upload your email data")).toBeInTheDocument();
+  });
 
-      const button = screen.getByText("Generate Report");
-      fireEvent.click(button);
+  it("renders drop zone with instructions", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-      // Wait for the report to load
-      await waitFor(() => {
-        expect(screen.getByText("Executive Summary")).toBeInTheDocument();
-      });
+    expect(screen.getByText(/\.mbox, \.pst, or maildir format/)).toBeInTheDocument();
+  });
 
-      expect(screen.getByText("Critical Personnel")).toBeInTheDocument();
-      expect(screen.getByText("Communication Structure")).toBeInTheDocument();
-      expect(
-        screen.getByText("This organization shows signs of...")
-      ).toBeInTheDocument();
-    });
+  it("renders privacy notice", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-    it("shows print button after report is generated", async () => {
-      const { default: ReportsPage } = await import(
-        "@/app/(app)/reports/page"
-      );
-      render(React.createElement(ReportsPage));
+    expect(
+      screen.getByText(/Processed locally/)
+    ).toBeInTheDocument();
+  });
 
-      fireEvent.click(screen.getByText("Generate Report"));
+  it("starts processing animation on click", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-      await waitFor(() => {
-        expect(screen.getByText("Print / Save PDF")).toBeInTheDocument();
-      });
+    const uploadCard = screen.getByText("Upload your email data").closest("div");
+    fireEvent.click(uploadCard!);
+
+    await waitFor(() => {
+      expect(screen.getByText("Analyzing...")).toBeInTheDocument();
     });
   });
 
-  describe("Landing/Upload Page", () => {
-    it("renders the main headline", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
+  it("shows processing steps after click", async () => {
+    const { default: LandingPage } = await import("@/app/page");
+    render(React.createElement(LandingPage));
 
-      expect(
-        screen.getByText("Understand your organization")
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText("in minutes, not months")
-      ).toBeInTheDocument();
-    });
+    const uploadCard = screen.getByText("Upload your email data").closest("div");
+    fireEvent.click(uploadCard!);
 
-    it("renders upload description", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      expect(
-        screen.getByText(/Upload your company/)
-      ).toBeInTheDocument();
-    });
-
-    it("renders drop zone with instructions", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      expect(
-        screen.getByText("Drop your email export here")
-      ).toBeInTheDocument();
-      expect(
-        screen.getByText(/\.mbox, \.pst, or maildir format/)
-      ).toBeInTheDocument();
-    });
-
-    it("renders privacy notice", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      expect(
-        screen.getByText(
-          "Your data is processed locally and never leaves your infrastructure."
-        )
-      ).toBeInTheDocument();
-    });
-
-    it("renders OrgVitals branding", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      expect(screen.getByText("OrgVitals")).toBeInTheDocument();
-    });
-
-    it("starts processing animation on click", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      const dropZone = screen.getByText("Drop your email export here").closest("div");
-      fireEvent.click(dropZone!);
-
-      await waitFor(() => {
-        expect(
-          screen.getByText("Analyzing your organization...")
-        ).toBeInTheDocument();
-      });
-    });
-
-    it("shows processing steps after click", async () => {
-      const { default: LandingPage } = await import("@/app/page");
-      render(React.createElement(LandingPage));
-
-      const dropZone = screen.getByText("Drop your email export here").closest("div");
-      fireEvent.click(dropZone!);
-
-      await waitFor(() => {
-        expect(screen.getByText("Parsing emails...")).toBeInTheDocument();
-        expect(
-          screen.getByText("Building communication graph...")
-        ).toBeInTheDocument();
-        expect(
-          screen.getByText("Computing centrality metrics...")
-        ).toBeInTheDocument();
-      });
+    await waitFor(() => {
+      expect(screen.getByText("Parsing emails...")).toBeInTheDocument();
+      expect(screen.getByText("Building communication graph...")).toBeInTheDocument();
+      expect(screen.getByText("Computing centrality metrics...")).toBeInTheDocument();
     });
   });
 });

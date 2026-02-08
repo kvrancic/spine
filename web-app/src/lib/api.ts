@@ -10,6 +10,9 @@ import type {
   ReportSection,
   GraphNode,
   GraphEdge,
+  PersonPanel,
+  TrendsData,
+  RisksData,
 } from "./types";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -58,6 +61,18 @@ export async function getPerson(id: string): Promise<PersonDetail> {
 
 export async function getHealthReport(): Promise<{ report: ReportSection[] }> {
   return fetchJson("/api/reports/health");
+}
+
+export async function fetchPersonPanel(id: string): Promise<PersonPanel> {
+  return fetchJson<PersonPanel>(`/api/people/${encodeURIComponent(id)}/panel`);
+}
+
+export async function fetchTrends(): Promise<TrendsData> {
+  return fetchJson<TrendsData>("/api/trends");
+}
+
+export async function fetchRisks(): Promise<RisksData> {
+  return fetchJson<RisksData>("/api/risks");
 }
 
 export async function* streamChat(

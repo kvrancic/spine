@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OrgVitals — AI-Powered Organizational Intelligence",
-  description: "Instant graph-based diagnostics from email communication data",
+  title: "Spine — Organizational Intelligence",
+  description: "Graph-based diagnostics and AI-powered insights from communication data",
 };
 
 export default function RootLayout({

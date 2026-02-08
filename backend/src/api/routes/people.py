@@ -1,5 +1,6 @@
 """People list + detail endpoints."""
 
+import hashlib
 import json
 from pathlib import Path
 
@@ -10,8 +11,10 @@ from src.api.schemas import (
     PeopleListResponse,
     PersonDetailResponse,
     PersonMetrics,
+    PersonPanelResponse,
     PersonSentiment,
     PersonSummary,
+    Workstream,
 )
 
 router = APIRouter(prefix="/api/people", tags=["people"])
@@ -53,6 +56,168 @@ def get_people():
         ))
 
     return PeopleListResponse(people=people)
+
+
+def _seed(node_id: str, salt: str = "") -> float:
+    """Deterministic pseudo-random float from node id."""
+    h = int(hashlib.md5((node_id + salt).encode()).hexdigest()[:8], 16)
+    return (h % 1000) / 1000.0
+
+
+def _bin_label(value: float, thresholds: tuple = (0.33, 0.66)) -> str:
+    if value < thresholds[0]:
+        return "Low"
+    if value < thresholds[1]:
+        return "Medium"
+    return "High"
+
+
+@router.get("/{person_id:path}/panel", response_model=PersonPanelResponse)
+def get_person_panel(person_id: str):
+    """Rich panel data for a person (real + mock fields)."""
+    # Find the node
+    node = None
+    for n in _graph_data["nodes"]:
+        if n["id"] == person_id:
+            node = n
+            break
+    if not node:
+        raise HTTPException(status_code=404, detail=f"Person '{person_id}' not found")
+
+    # Build lookups
+    dms_map = {d["id"]: d for d in _metrics_data.get("dead_man_switch", [])}
+    dms = dms_map.get(person_id, {})
+    dms_score = dms.get("dms_score", 0)
+
+    # All DMS scores for percentile
+    all_dms = sorted([d.get("dms_score", 0) for d in _metrics_data.get("dead_man_switch", [])], reverse=True)
+    if all_dms:
+        rank_in_dms = next((i for i, s in enumerate(all_dms) if s <= dms_score), len(all_dms))
+        percentile = rank_in_dms / len(all_dms)
+    else:
+        percentile = 1.0
+
+    # Alert tier
+    if percentile < 0.10:
+        alert_tier = "critical"
+    elif percentile < 0.30:
+        alert_tier = "warning"
+    else:
+        alert_tier = "healthy"
+
+    # First email from edges
+    first_email = None
+    for e in _graph_data.get("edges", []):
+        if e["source"] == person_id or e["target"] == person_id:
+            fe = e.get("first_email")
+            if fe and (first_email is None or fe < first_email):
+                first_email = fe
+
+    # Communication health
+    total_sent = node.get("total_sent", 0)
+    total_received = node.get("total_received", 0)
+    total = total_sent + total_received
+    in_pct = round((total_received / total) * 100, 1) if total > 0 else 50.0
+    out_pct = round(100 - in_pct, 1)
+
+    # Mock fields seeded from node ID
+    s = _seed(person_id)
+    emails_per_day = round(total_sent / max(1, 365 * 2), 1)  # ~2 years of data
+    median_response_time = round(1 + s * 7, 1)  # 1-8 hrs
+
+    if total > 5000:
+        after_hours = "High"
+    elif total > 1000:
+        after_hours = "Med"
+    else:
+        after_hours = "Low"
+
+    # Org position
+    betweenness = node.get("betweenness", 0)
+    if dms_score > 0.3:
+        spof_risk = "Critical"
+    elif dms_score > 0.15:
+        spof_risk = "High"
+    elif dms_score > 0.05:
+        spof_risk = "Medium"
+    else:
+        spof_risk = "Low"
+
+    removal_lcc = round(dms_score * 40, 1)
+    removal_path = round(betweenness * 200, 1)
+
+    # Influence & Flow
+    in_deg = node.get("in_degree_centrality", 0)
+    out_deg = node.get("out_degree_centrality", 0)
+
+    # Role snapshot
+    community_id = node.get("community_id", 0)
+    centrality_rank_label = "high" if betweenness > 0.01 else "moderate" if betweenness > 0.001 else "low"
+    role_snapshot = (
+        f"Member of Community {community_id} with {centrality_rank_label} centrality. "
+        f"Sends ~{total_sent} and receives ~{total_received} emails. "
+        f"Acts as a {'key connector' if betweenness > 0.005 else 'regular participant'} in the network."
+    )
+
+    # Workstreams (mock)
+    ws_labels = ["Operations", "Strategy", "Compliance", "Client Relations",
+                 "Risk Mgmt", "Finance", "HR", "IT"]
+    s2 = _seed(person_id, "ws")
+    n_ws = 3 + int(s2 * 2)  # 3-4 workstreams
+    raw = [int(10 + _seed(person_id, f"ws{i}") * 90) for i in range(n_ws)]
+    total_raw = sum(raw)
+    workstreams = [
+        Workstream(label=ws_labels[(community_id * 2 + i) % len(ws_labels)],
+                   percent=round(r / total_raw * 100))
+        for i, r in enumerate(raw)
+    ]
+
+    # Recent changes (mock heuristic)
+    vol_delta = round((_seed(person_id, "vol") - 0.5) * 30, 1)
+    div_delta = round((_seed(person_id, "div") - 0.5) * 20, 1)
+    new_topic = "Restructuring Initiative" if _seed(person_id, "topic") > 0.7 else None
+
+    # Peer comparison
+    community_members = [n2 for n2 in _graph_data["nodes"] if n2.get("community_id") == community_id]
+    community_members.sort(key=lambda x: x.get("betweenness", 0), reverse=True)
+    peer_rank = next((i + 1 for i, m in enumerate(community_members) if m["id"] == person_id), 0)
+
+    # Likely backups: same community, similar betweenness
+    backups = []
+    for m in community_members:
+        if m["id"] != person_id and abs(m.get("betweenness", 0) - betweenness) < betweenness * 0.5:
+            backups.append(m["name"])
+            if len(backups) >= 3:
+                break
+
+    return PersonPanelResponse(
+        id=person_id,
+        name=node["name"],
+        email=node["email"],
+        community_id=community_id,
+        alert_tier=alert_tier,
+        since=first_email[:10] if first_email else None,
+        role_snapshot=role_snapshot,
+        workstreams=workstreams,
+        emails_per_day=emails_per_day,
+        in_pct=in_pct,
+        out_pct=out_pct,
+        median_response_time_hrs=median_response_time,
+        after_hours_activity=after_hours,
+        betweenness=round(betweenness, 6),
+        spof_risk=spof_risk,
+        removal_impact_lcc_pct=removal_lcc,
+        removal_impact_avg_path_pct=removal_path,
+        in_degree_bin=_bin_label(in_deg),
+        out_degree_bin=_bin_label(out_deg),
+        response_latency=_bin_label(_seed(person_id, "latency")),
+        volume_delta_pct=vol_delta,
+        new_topic=new_topic,
+        diversity_delta_pct=div_delta,
+        peer_rank=peer_rank,
+        peer_total=len(community_members),
+        likely_backups=backups,
+    )
 
 
 @router.get("/{person_id:path}", response_model=PersonDetailResponse)

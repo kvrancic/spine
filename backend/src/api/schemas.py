@@ -180,6 +180,98 @@ class PersonDetailResponse(BaseModel):
     connections: list[ConnectionDetail] = []
 
 
+class Workstream(BaseModel):
+    label: str
+    percent: int
+
+
+class PersonPanelResponse(BaseModel):
+    id: str
+    name: str
+    email: str
+    community_id: int | None = None
+    alert_tier: str  # "critical" | "warning" | "healthy"
+    since: str | None = None
+
+    # Role Snapshot
+    role_snapshot: str
+
+    # Workstreams
+    workstreams: list[Workstream]
+
+    # Communication Health
+    emails_per_day: float
+    in_pct: float
+    out_pct: float
+    median_response_time_hrs: float
+    after_hours_activity: str  # Low / Med / High
+
+    # Org Position
+    betweenness: float
+    spof_risk: str  # Low / Medium / High / Critical
+    removal_impact_lcc_pct: float
+    removal_impact_avg_path_pct: float
+
+    # Influence & Flow
+    in_degree_bin: str  # Low / Medium / High
+    out_degree_bin: str
+    response_latency: str  # Low / Med / High
+
+    # Recent Changes (14d)
+    volume_delta_pct: float
+    new_topic: str | None = None
+    diversity_delta_pct: float
+
+    # Comparisons
+    peer_rank: int
+    peer_total: int
+    likely_backups: list[str]
+
+
+class TrendItem(BaseModel):
+    person_id: str
+    person_name: str
+    metric: str
+    value: float
+    delta_pct: float
+
+
+class TrendsResponse(BaseModel):
+    structural_shifts: list[TrendItem]
+    communication_shifts: list[TrendItem]
+    workstream_shifts: list[TrendItem]
+
+
+class HighRiskNode(BaseModel):
+    id: str
+    name: str
+    risk_score: float
+    risk_label: str
+    key_vulnerability: str
+    impact_pct: float
+
+
+class StructuralRisk(BaseModel):
+    label: str
+    description: str
+    severity: str  # Low / Medium / High / Critical
+    value: float
+
+
+class WasteOffender(BaseModel):
+    id: str
+    name: str
+    waste_score: float
+    broadcast_ratio: float
+    orphan_ratio: float
+
+
+class RisksResponse(BaseModel):
+    high_risk_nodes: list[HighRiskNode]
+    structural_risks: list[StructuralRisk]
+    communication_waste: list[WasteOffender]
+
+
 class ChatRequest(BaseModel):
     message: str
     history: list[dict] = []

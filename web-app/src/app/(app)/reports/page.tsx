@@ -26,7 +26,7 @@ export default function ReportsPage() {
 
   if (!generated) {
     return (
-      <div className="max-w-3xl mx-auto text-center pt-16">
+      <div className="max-w-3xl mx-auto text-center pt-16 p-6">
         <FileText className="w-12 h-12 text-[var(--muted)] mx-auto mb-4" />
         <h2 className="text-xl font-semibold mb-2">Organizational Health Report</h2>
         <p className="text-sm text-[var(--muted)] mb-8 max-w-md mx-auto">
@@ -37,7 +37,7 @@ export default function ReportsPage() {
         <button
           onClick={generateReport}
           disabled={loading}
-          className="inline-flex items-center gap-2 bg-[var(--accent)] text-white px-6 py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 transition-colors"
+          className="inline-flex items-center gap-2 bg-[var(--foreground)] text-white px-6 py-3 rounded-lg font-medium hover:bg-gray-800 disabled:opacity-50 transition-colors"
         >
           {loading ? (
             <>
@@ -63,7 +63,7 @@ export default function ReportsPage() {
 
   return (
     <motion.div
-      className="max-w-4xl mx-auto"
+      className="max-w-4xl mx-auto p-6"
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       transition={{ duration: 0.3 }}

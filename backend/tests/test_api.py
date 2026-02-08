@@ -107,3 +107,54 @@ class TestPeopleEndpoints:
     def test_get_person_not_found(self):
         r = client.get("/api/people/nonexistent@enron.com")
         assert r.status_code == 404
+
+    def test_get_person_panel(self):
+        # Get first person id
+        r = client.get("/api/people")
+        person_id = r.json()["people"][0]["id"]
+
+        r = client.get(f"/api/people/{person_id}/panel")
+        assert r.status_code == 200
+        data = r.json()
+        assert data["id"] == person_id
+        assert data["name"]
+        assert data["email"]
+        assert data["alert_tier"] in ("critical", "warning", "healthy")
+        assert "role_snapshot" in data
+        assert "workstreams" in data
+        assert len(data["workstreams"]) >= 3
+        assert "emails_per_day" in data
+        assert "betweenness" in data
+        assert "spof_risk" in data
+        assert "peer_rank" in data
+
+    def test_get_person_panel_not_found(self):
+        r = client.get("/api/people/nonexistent@enron.com/panel")
+        assert r.status_code == 404
+
+
+class TestTrendsEndpoint:
+    def test_get_trends(self):
+        r = client.get("/api/trends")
+        assert r.status_code == 200
+        data = r.json()
+        assert "structural_shifts" in data
+        assert "communication_shifts" in data
+        assert "workstream_shifts" in data
+        assert len(data["structural_shifts"]) > 0
+        assert "person_id" in data["structural_shifts"][0]
+        assert "delta_pct" in data["structural_shifts"][0]
+
+
+class TestRisksEndpoint:
+    def test_get_risks(self):
+        r = client.get("/api/risks")
+        assert r.status_code == 200
+        data = r.json()
+        assert "high_risk_nodes" in data
+        assert "structural_risks" in data
+        assert "communication_waste" in data
+        assert len(data["high_risk_nodes"]) > 0
+        assert "risk_score" in data["high_risk_nodes"][0]
+        assert "risk_label" in data["high_risk_nodes"][0]
+        assert len(data["structural_risks"]) > 0

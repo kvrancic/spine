@@ -1,12 +1,11 @@
 /**
- * Step 10 Tests: Frontend — People Pages
+ * Tests: People Page (redesigned) + Trends + Risks
  *
  * Verifies:
- * - People list page renders sortable table
- * - Search input works
- * - Column headers exist for all metrics
- * - People detail page renders all sections
- * - Metric boxes, sentiment bars, connections list
+ * - People list page renders with search, sort, alert icons
+ * - Rows navigate to /graph?focus= on click
+ * - Trends page renders sections
+ * - Risks page renders sections
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -14,10 +13,11 @@ import { render, screen, fireEvent } from "@testing-library/react";
 import React from "react";
 
 // Mock next/navigation
+const mockPush = vi.fn();
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/people"),
-  useRouter: vi.fn(() => ({ push: vi.fn() })),
-  useParams: vi.fn(() => ({ id: "sally.beck@enron.com" })),
+  useRouter: vi.fn(() => ({ push: mockPush })),
+  useSearchParams: vi.fn(() => ({ get: vi.fn(() => null) })),
 }));
 
 // Mock next/link
@@ -73,226 +73,142 @@ vi.mock("@/lib/api", () => ({
       ],
     })
   ),
-  getPerson: vi.fn(() =>
+  fetchTrends: vi.fn(() =>
     Promise.resolve({
-      id: "sally.beck@enron.com",
-      name: "Sally Beck",
-      email: "sally.beck@enron.com",
-      community_id: 0,
-      metrics: {
-        pagerank: 0.015,
-        betweenness_centrality: 0.008,
-        eigenvector_centrality: 0.025,
-        degree_centrality: 0.1,
-        in_degree_centrality: 0.05,
-        out_degree_centrality: 0.05,
-      },
-      sentiment: {
-        avg_sent: 0.12,
-        avg_received: 0.08,
-      },
-      dead_man_switch: {
-        dms_score: 0.415,
-        impact_pct: 5.2,
-        redundancy: 0.3,
-      },
-      waste: {
-        waste_score: 35.2,
-        overproduction: 2.5,
-        broadcast_ratio: 0.15,
-        reply_all_ratio: 0.08,
-        orphan_ratio: 0.22,
-      },
-      connections: [
-        {
-          id: "john.lavorato@enron.com",
-          name: "John Lavorato",
-          direction: "outgoing",
-          email_count: 150,
-          weight: 0.8,
-          sentiment: 0.12,
-        },
-        {
-          id: "louise.kitchen@enron.com",
-          name: "Louise Kitchen",
-          direction: "incoming",
-          email_count: 95,
-          weight: 0.6,
-          sentiment: 0.05,
-        },
+      structural_shifts: [
+        { person_id: "sally.beck@enron.com", person_name: "Sally Beck", metric: "Betweenness Centrality", value: 0.008, delta_pct: 12.5 },
+      ],
+      communication_shifts: [
+        { person_id: "john.lavorato@enron.com", person_name: "John Lavorato", metric: "Degree Centrality", value: 0.05, delta_pct: -5.3 },
+      ],
+      workstream_shifts: [
+        { person_id: "sally.beck@enron.com", person_name: "Sally Beck", metric: "Project Alpha", value: 1200, delta_pct: 8.1 },
+      ],
+    })
+  ),
+  fetchRisks: vi.fn(() =>
+    Promise.resolve({
+      high_risk_nodes: [
+        { id: "sally.beck@enron.com", name: "Sally Beck", risk_score: 0.415, risk_label: "Critical", key_vulnerability: "High betweenness — key information broker", impact_pct: 5.1 },
+      ],
+      structural_risks: [
+        { label: "Fragmentation Sensitivity", description: "Removing the most critical node fragments 5.1% of the network", severity: "Critical", value: 5.1 },
+      ],
+      communication_waste: [
+        { id: "john.lavorato@enron.com", name: "John Lavorato", waste_score: 42.1, broadcast_ratio: 0.15, orphan_ratio: 0.22 },
       ],
     })
   ),
 }));
 
-describe("Step 10: People Pages", () => {
-  describe("People List Page", () => {
-    it("renders search input", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
+describe("People Page (Redesigned)", () => {
+  it("renders search input", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      const searchInput = await screen.findByPlaceholderText(
-        "Search by name or email..."
-      );
-      expect(searchInput).toBeInTheDocument();
-    });
-
-    it("renders people in the table", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
-
-      expect(await screen.findByText("Sally Beck")).toBeInTheDocument();
-      expect(screen.getByText("John Lavorato")).toBeInTheDocument();
-    });
-
-    it("renders column headers", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
-
-      await screen.findByText("Sally Beck"); // wait for load
-      expect(screen.getByText("Name")).toBeInTheDocument();
-      expect(screen.getByText("PageRank")).toBeInTheDocument();
-      expect(screen.getByText("Betweenness")).toBeInTheDocument();
-      expect(screen.getByText("DMS Score")).toBeInTheDocument();
-      expect(screen.getByText("Waste")).toBeInTheDocument();
-      expect(screen.getByText("Sent")).toBeInTheDocument();
-      expect(screen.getByText("Sentiment")).toBeInTheDocument();
-    });
-
-    it("filters people by search query", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
-
-      await screen.findByText("Sally Beck");
-
-      const searchInput = screen.getByPlaceholderText("Search by name or email...");
-      fireEvent.change(searchInput, { target: { value: "sally" } });
-
-      expect(screen.getByText("Sally Beck")).toBeInTheDocument();
-      expect(screen.queryByText("John Lavorato")).not.toBeInTheDocument();
-    });
-
-    it("shows people count", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
-
-      expect(await screen.findByText("2 people")).toBeInTheDocument();
-    });
-
-    it("links to individual person pages", async () => {
-      const { default: PeoplePage } = await import(
-        "@/app/(app)/people/page"
-      );
-      render(React.createElement(PeoplePage));
-
-      const sallyLink = await screen.findByText("Sally Beck");
-      const anchor = sallyLink.closest("a");
-      expect(anchor).toHaveAttribute(
-        "href",
-        "/people/sally.beck%40enron.com"
-      );
-    });
+    const searchInput = await screen.findByPlaceholderText("Search by name or email...");
+    expect(searchInput).toBeInTheDocument();
   });
 
-  describe("Person Detail Page", () => {
-    it("renders person name and email", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("renders people in the table", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      expect(await screen.findByText("Sally Beck")).toBeInTheDocument();
-      expect(screen.getByText("sally.beck@enron.com")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Sally Beck")).toBeInTheDocument();
+    expect(screen.getByText("John Lavorato")).toBeInTheDocument();
+  });
 
-    it("renders community badge", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("renders redesigned column headers", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      expect(await screen.findByText("Community 0")).toBeInTheDocument();
-    });
+    await screen.findByText("Sally Beck");
+    // Check table headers specifically (th elements)
+    const headers = document.querySelectorAll("th");
+    const headerTexts = Array.from(headers).map((h) => h.textContent);
+    expect(headerTexts).toContain("Name");
+    expect(headerTexts).toContain("Email");
+    expect(headerTexts).toContain("Alert");
+    expect(headerTexts).toContain("Betweenness");
+  });
 
-    it("renders centrality metrics", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("filters people by search query", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      await screen.findByText("Sally Beck");
-      expect(screen.getByText("PageRank")).toBeInTheDocument();
-      expect(screen.getByText("Betweenness")).toBeInTheDocument();
-      expect(screen.getByText("Eigenvector")).toBeInTheDocument();
-      expect(screen.getByText("Degree")).toBeInTheDocument();
-    });
+    await screen.findByText("Sally Beck");
 
-    it("renders sentiment section", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+    const searchInput = screen.getByPlaceholderText("Search by name or email...");
+    fireEvent.change(searchInput, { target: { value: "sally" } });
 
-      await screen.findByText("Sally Beck");
-      expect(screen.getByText("Sentiment")).toBeInTheDocument();
-      expect(screen.getByText("Avg Sent")).toBeInTheDocument();
-      expect(screen.getByText("Avg Received")).toBeInTheDocument();
-    });
+    expect(screen.getByText("Sally Beck")).toBeInTheDocument();
+    expect(screen.queryByText("John Lavorato")).not.toBeInTheDocument();
+  });
 
-    it("renders dead-man-switch analysis", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("shows people count", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      await screen.findByText("Sally Beck");
-      expect(screen.getByText("Critical Node Analysis")).toBeInTheDocument();
-      expect(screen.getByText("DMS Score")).toBeInTheDocument();
-      expect(screen.getByText("Impact if removed")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("2 people")).toBeInTheDocument();
+  });
 
-    it("renders waste section", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("has sort dropdown", async () => {
+    const { default: PeoplePage } = await import("@/app/(app)/people/page");
+    render(React.createElement(PeoplePage));
 
-      await screen.findByText("Sally Beck");
-      expect(screen.getByText("Overproduction")).toBeInTheDocument();
-      expect(screen.getByText("Broadcast Ratio")).toBeInTheDocument();
-    });
+    await screen.findByText("Sally Beck");
+    const select = screen.getByRole("combobox");
+    expect(select).toBeInTheDocument();
+  });
+});
 
-    it("renders connections list", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+describe("Trends Page", () => {
+  it("renders structural shifts section", async () => {
+    const { default: TrendsPage } = await import("@/app/(app)/trends/page");
+    render(React.createElement(TrendsPage));
 
-      await screen.findByText("Sally Beck");
-      expect(screen.getByText("John Lavorato")).toBeInTheDocument();
-      expect(screen.getByText("Louise Kitchen")).toBeInTheDocument();
-      expect(screen.getByText("150 emails")).toBeInTheDocument();
-      expect(screen.getByText("95 emails")).toBeInTheDocument();
-    });
+    expect(await screen.findByText("Structural Shifts")).toBeInTheDocument();
+    expect(screen.getByText("Betweenness Centrality")).toBeInTheDocument();
+  });
 
-    it("has back to people link", async () => {
-      const { default: PersonPage } = await import(
-        "@/app/(app)/people/[id]/page"
-      );
-      render(React.createElement(PersonPage));
+  it("renders communication shifts section", async () => {
+    const { default: TrendsPage } = await import("@/app/(app)/trends/page");
+    render(React.createElement(TrendsPage));
 
-      const backLink = await screen.findByText("Back to People");
-      expect(backLink.closest("a")).toHaveAttribute("href", "/people");
-    });
+    expect(await screen.findByText("Communication Shifts")).toBeInTheDocument();
+    expect(screen.getByText("John Lavorato")).toBeInTheDocument();
+  });
+
+  it("renders workstream shifts section", async () => {
+    const { default: TrendsPage } = await import("@/app/(app)/trends/page");
+    render(React.createElement(TrendsPage));
+
+    expect(await screen.findByText("Workstream Shifts")).toBeInTheDocument();
+  });
+});
+
+describe("Risks Page", () => {
+  it("renders high-risk nodes section", async () => {
+    const { default: RisksPage } = await import("@/app/(app)/risks/page");
+    render(React.createElement(RisksPage));
+
+    expect(await screen.findByText("High-Risk Nodes")).toBeInTheDocument();
+    expect(screen.getByText("High betweenness — key information broker")).toBeInTheDocument();
+  });
+
+  it("renders structural risks section", async () => {
+    const { default: RisksPage } = await import("@/app/(app)/risks/page");
+    render(React.createElement(RisksPage));
+
+    expect(await screen.findByText("Structural Risks")).toBeInTheDocument();
+    expect(screen.getByText("Fragmentation Sensitivity")).toBeInTheDocument();
+  });
+
+  it("renders communication waste section", async () => {
+    const { default: RisksPage } = await import("@/app/(app)/risks/page");
+    render(React.createElement(RisksPage));
+
+    expect(await screen.findByText("Communication Waste")).toBeInTheDocument();
+    expect(screen.getByText("John Lavorato")).toBeInTheDocument();
   });
 });

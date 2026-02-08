@@ -3,7 +3,13 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { Upload, Activity, CheckCircle, Loader2 } from "lucide-react";
+import dynamic from "next/dynamic";
+import { Upload, CheckCircle, Loader2 } from "lucide-react";
+
+const ShaderAnimation = dynamic(
+  () => import("@/components/ui/shader-animation"),
+  { ssr: false }
+);
 
 const PROCESSING_STEPS = [
   { label: "Parsing emails...", duration: 1200 },
@@ -12,7 +18,7 @@ const PROCESSING_STEPS = [
   { label: "Detecting communities...", duration: 800 },
   { label: "Analyzing sentiment...", duration: 1200 },
   { label: "Computing health score...", duration: 600 },
-  { label: "Preparing dashboard...", duration: 500 },
+  { label: "Preparing graph view...", duration: 500 },
 ];
 
 export default function LandingPage() {
@@ -27,7 +33,7 @@ export default function LandingPage() {
 
     const runStep = () => {
       if (step >= PROCESSING_STEPS.length) {
-        setTimeout(() => router.push("/dashboard"), 500);
+        setTimeout(() => router.push("/graph"), 500);
         return;
       }
       setCurrentStep(step);
@@ -39,76 +45,74 @@ export default function LandingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-white flex flex-col">
-      {/* Header */}
-      <header className="border-b border-gray-100 px-8 py-4">
-        <div className="flex items-center gap-2">
-          <Activity className="w-6 h-6 text-[var(--accent)]" />
-          <span className="font-semibold text-lg tracking-tight">OrgVitals</span>
-        </div>
-      </header>
+    <div className="min-h-screen relative overflow-hidden">
+      {/* Shader background */}
+      <ShaderAnimation />
 
-      {/* Main */}
-      <main className="flex-1 flex items-center justify-center px-8">
-        <div className="max-w-2xl w-full text-center">
-          <AnimatePresence mode="wait">
-            {!processing ? (
-              <motion.div
-                key="upload"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                transition={{ duration: 0.3 }}
+      {/* Wordmark */}
+      <div className="absolute top-8 left-0 right-0 flex justify-center z-10">
+        <h1 className="text-white text-4xl font-bold tracking-tight">Spine</h1>
+      </div>
+
+      {/* Content overlay */}
+      <div className="relative z-10 min-h-screen flex items-center justify-center px-8">
+        <AnimatePresence mode="wait">
+          {!processing ? (
+            <motion.div
+              key="upload"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-lg w-full"
+            >
+              <div
+                className={`bg-white/90 backdrop-blur-sm rounded-2xl p-10 border transition-colors ${
+                  dragOver
+                    ? "border-[var(--foreground)]"
+                    : "border-gray-200 hover:border-gray-400"
+                }`}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  setDragOver(true);
+                }}
+                onDragLeave={() => setDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setDragOver(false);
+                  startProcessing();
+                }}
+                onClick={startProcessing}
               >
-                <h1 className="text-4xl font-bold tracking-tight mb-3">
-                  Understand your organization
-                  <br />
-                  <span className="text-[var(--accent)]">in minutes, not months</span>
-                </h1>
-                <p className="text-lg text-[var(--muted)] mb-10">
-                  Upload your company&apos;s email data for instant graph-based diagnostics,
-                  critical people identification, and AI-powered organizational intelligence.
-                </p>
-
-                {/* Drop zone */}
-                <div
-                  className={`border-2 border-dashed rounded-2xl p-12 transition-colors cursor-pointer ${
-                    dragOver
-                      ? "border-[var(--accent)] bg-[var(--accent-light)]"
-                      : "border-gray-300 hover:border-[var(--accent)] hover:bg-gray-50"
-                  }`}
-                  onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
-                  onDragLeave={() => setDragOver(false)}
-                  onDrop={(e) => { e.preventDefault(); setDragOver(false); startProcessing(); }}
-                  onClick={startProcessing}
-                >
-                  <Upload className="w-10 h-10 text-[var(--muted)] mx-auto mb-4" />
-                  <p className="text-lg font-medium mb-1">
-                    Drop your email export here
+                <div className="text-center cursor-pointer">
+                  <Upload className="w-8 h-8 text-[var(--muted)] mx-auto mb-4" />
+                  <h2 className="text-xl font-semibold mb-2">
+                    Upload your email data
+                  </h2>
+                  <p className="text-sm text-[var(--muted)] mb-1">
+                    .mbox, .pst, or maildir format
                   </p>
-                  <p className="text-sm text-[var(--muted)]">
-                    .mbox, .pst, or maildir format — or click to browse
+                  <p className="text-xs text-[var(--muted)]">
+                    Processed locally — never leaves your infrastructure
                   </p>
                 </div>
-
-                <p className="text-xs text-[var(--muted)] mt-6">
-                  Your data is processed locally and never leaves your infrastructure.
-                </p>
-              </motion.div>
-            ) : (
-              <motion.div
-                key="processing"
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.3 }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-center gap-3 mb-8">
-                  <Loader2 className="w-6 h-6 text-[var(--accent)] animate-spin" />
-                  <h2 className="text-2xl font-bold">Analyzing your organization...</h2>
+              </div>
+            </motion.div>
+          ) : (
+            <motion.div
+              key="processing"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3 }}
+              className="max-w-md w-full"
+            >
+              <div className="bg-white/90 backdrop-blur-sm rounded-2xl p-8 border border-gray-200">
+                <div className="flex items-center justify-center gap-3 mb-6">
+                  <Loader2 className="w-5 h-5 text-[var(--foreground)] animate-spin" />
+                  <h2 className="text-lg font-semibold">Analyzing...</h2>
                 </div>
 
-                <div className="space-y-3 text-left max-w-md mx-auto">
+                <div className="space-y-2.5">
                   {PROCESSING_STEPS.map((step, i) => (
                     <motion.div
                       key={step.label}
@@ -118,26 +122,32 @@ export default function LandingPage() {
                         opacity: i <= currentStep ? 1 : 0.3,
                         x: 0,
                       }}
-                      transition={{ delay: i * 0.1, duration: 0.2 }}
+                      transition={{ delay: i * 0.08, duration: 0.2 }}
                     >
                       {i < currentStep ? (
-                        <CheckCircle className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <CheckCircle className="w-4 h-4 text-green-500 flex-shrink-0" />
                       ) : i === currentStep ? (
-                        <Loader2 className="w-5 h-5 text-[var(--accent)] animate-spin flex-shrink-0" />
+                        <Loader2 className="w-4 h-4 text-[var(--foreground)] animate-spin flex-shrink-0" />
                       ) : (
-                        <div className="w-5 h-5 rounded-full border-2 border-gray-200 flex-shrink-0" />
+                        <div className="w-4 h-4 rounded-full border-2 border-gray-200 flex-shrink-0" />
                       )}
-                      <span className={`text-sm ${i <= currentStep ? "text-[var(--foreground)]" : "text-gray-400"}`}>
+                      <span
+                        className={`text-sm ${
+                          i <= currentStep
+                            ? "text-[var(--foreground)]"
+                            : "text-gray-400"
+                        }`}
+                      >
                         {step.label}
                       </span>
                     </motion.div>
                   ))}
                 </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </main>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }

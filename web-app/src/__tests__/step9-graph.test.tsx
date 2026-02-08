@@ -1,13 +1,11 @@
 /**
- * Step 9 Tests: Frontend — Interactive Force Graph
+ * Tests: Graph Page (redesigned)
  *
  * Verifies:
- * - Graph page component exists and renders
- * - Search input exists
- * - Edge threshold slider exists
- * - Node click opens detail panel
- * - Community colors are defined
- * - Filtering logic works correctly
+ * - Graph page renders with loading state
+ * - Search input exists (no threshold slider)
+ * - ForceGraph component renders
+ * - PersonPanel integration
  */
 
 import { describe, it, expect, vi } from "vitest";
@@ -18,6 +16,7 @@ import React from "react";
 vi.mock("next/navigation", () => ({
   usePathname: vi.fn(() => "/graph"),
   useRouter: vi.fn(() => ({ push: vi.fn() })),
+  useSearchParams: vi.fn(() => ({ get: vi.fn(() => null) })),
 }));
 
 // Mock next/link
@@ -102,62 +101,66 @@ vi.mock("@/lib/api", () => ({
       ],
     })
   ),
+  fetchPersonPanel: vi.fn(() =>
+    Promise.resolve({
+      id: "sally.beck@enron.com",
+      name: "Sally Beck",
+      email: "sally.beck@enron.com",
+      community_id: 0,
+      alert_tier: "critical",
+      since: "2000-01-15",
+      role_snapshot: "Member of Community 0 with high centrality.",
+      workstreams: [{ label: "Operations", percent: 60 }, { label: "Strategy", percent: 40 }],
+      emails_per_day: 1.6,
+      in_pct: 62.5,
+      out_pct: 37.5,
+      median_response_time_hrs: 4.2,
+      after_hours_activity: "High",
+      betweenness: 0.005,
+      spof_risk: "Critical",
+      removal_impact_lcc_pct: 16.6,
+      removal_impact_avg_path_pct: 1.0,
+      in_degree_bin: "Medium",
+      out_degree_bin: "Medium",
+      response_latency: "Low",
+      volume_delta_pct: 5.2,
+      new_topic: null,
+      diversity_delta_pct: -3.1,
+      peer_rank: 1,
+      peer_total: 15,
+      likely_backups: ["John Lavorato"],
+    })
+  ),
 }));
 
-describe("Step 9: Interactive Force Graph", () => {
+describe("Graph Page (Redesigned)", () => {
   it("renders the graph page with loading state initially", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
+    const { default: GraphPage } = await import("@/app/(app)/graph/page");
     render(React.createElement(GraphPage));
 
-    // Initially should show loading spinner (border-b-2 is in the spinner class)
     const spinner = document.querySelector(".animate-spin");
     expect(spinner).toBeInTheDocument();
   });
 
   it("renders search input after loading", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
+    const { default: GraphPage } = await import("@/app/(app)/graph/page");
     render(React.createElement(GraphPage));
 
-    // Wait for data to load
     const searchInput = await screen.findByPlaceholderText("Search people...");
     expect(searchInput).toBeInTheDocument();
   });
 
-  it("renders edge threshold slider after loading", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
+  it("does NOT render edge threshold slider", async () => {
+    const { default: GraphPage } = await import("@/app/(app)/graph/page");
     render(React.createElement(GraphPage));
 
-    // Wait for data to load
-    const slider = await screen.findByRole("slider");
-    expect(slider).toBeInTheDocument();
-    expect(slider).toHaveAttribute("min", "0");
-    expect(slider).toHaveAttribute("max", "0.8");
-  });
-
-  it("shows node and edge counts", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
-    render(React.createElement(GraphPage));
-
-    // Wait for data to load and check counts
-    const nodeCount = await screen.findByText("2 nodes");
-    expect(nodeCount).toBeInTheDocument();
-
-    const edgeCount = screen.getByText("1 edges");
-    expect(edgeCount).toBeInTheDocument();
+    await screen.findByPlaceholderText("Search people...");
+    const slider = screen.queryByRole("slider");
+    expect(slider).not.toBeInTheDocument();
   });
 
   it("updates search query when typing", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
+    const { default: GraphPage } = await import("@/app/(app)/graph/page");
     render(React.createElement(GraphPage));
 
     const searchInput = await screen.findByPlaceholderText("Search people...");
@@ -166,9 +169,7 @@ describe("Step 9: Interactive Force Graph", () => {
   });
 
   it("renders ForceGraph component", async () => {
-    const { default: GraphPage } = await import(
-      "@/app/(app)/graph/page"
-    );
+    const { default: GraphPage } = await import("@/app/(app)/graph/page");
     render(React.createElement(GraphPage));
 
     const graph = await screen.findByTestId("force-graph");
@@ -176,9 +177,7 @@ describe("Step 9: Interactive Force Graph", () => {
   });
 
   it("has community colors defined", async () => {
-    // Import the module and check the colors are accessible
     const module = await import("@/app/(app)/graph/page");
-    // The COMMUNITY_COLORS are internal, but we can verify the module loads
     expect(module.default).toBeDefined();
   });
 });

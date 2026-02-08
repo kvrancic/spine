@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from src.api.routes import chat, graph, metrics, people, reports
+from src.api.routes import chat, graph, metrics, people, reports, risks, trends
 
 load_dotenv(Path(__file__).resolve().parents[3] / ".env")
 
@@ -40,6 +40,8 @@ def load_data():
     graph.init(graph_data)
     metrics.init(metrics_data, communities_data, graph_data)
     people.init(graph_data, metrics_data, people_dir)
+    trends.init(graph_data, metrics_data, communities_data)
+    risks.init(graph_data, metrics_data)
 
 
 @asynccontextmanager
@@ -49,8 +51,8 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="OrgVitals API",
-    description="AI-Powered Organizational Intelligence Platform",
+    title="Spine API",
+    description="Organizational Intelligence Platform",
     version="0.1.0",
     lifespan=lifespan,
 )
@@ -70,6 +72,8 @@ app.include_router(metrics.router)
 app.include_router(people.router)
 app.include_router(chat.router)
 app.include_router(reports.router)
+app.include_router(trends.router)
+app.include_router(risks.router)
 
 
 @app.get("/api/health")
