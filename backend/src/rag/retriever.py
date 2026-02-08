@@ -16,9 +16,12 @@ OUTPUT_DIR = Path(__file__).resolve().parents[2] / "output"
 
 
 def get_collection():
-    """Get the ChromaDB collection."""
-    chroma = chromadb.PersistentClient(path=str(CHROMA_DIR))
-    return chroma.get_collection(name=COLLECTION_NAME)
+    """Get the ChromaDB collection. Returns None if unavailable."""
+    try:
+        chroma = chromadb.PersistentClient(path=str(CHROMA_DIR))
+        return chroma.get_collection(name=COLLECTION_NAME)
+    except Exception:
+        return None
 
 
 def load_graph_data():
@@ -63,26 +66,28 @@ def retrieve_context(question: str, top_k: int = 15) -> str:
     graph_data = load_graph_data()
     metrics_data = load_metrics_data()
 
-    # 1. Embed question and query ChromaDB
-    q_response = client.embeddings.create(
-        model="text-embedding-3-large",
-        input=[question],
-    )
-    q_embedding = q_response.data[0].embedding
-
-    results = collection.query(
-        query_embeddings=[q_embedding],
-        n_results=top_k,
-    )
-
-    # Build email context
+    # 1. Embed question and query ChromaDB (if available)
     email_context = "## Relevant Emails\n\n"
-    if results["documents"] and results["documents"][0]:
-        for i, (doc, meta) in enumerate(zip(results["documents"][0], results["metadatas"][0])):
-            email_context += f"**Email {i+1}** (From: {meta.get('sender', 'unknown')}, "
-            email_context += f"Date: {meta.get('date', 'unknown')}, "
-            email_context += f"Subject: {meta.get('subject', '')})\n"
-            email_context += f"{doc[:500]}\n\n"
+    if collection is not None:
+        q_response = client.embeddings.create(
+            model="text-embedding-3-large",
+            input=[question],
+        )
+        q_embedding = q_response.data[0].embedding
+
+        results = collection.query(
+            query_embeddings=[q_embedding],
+            n_results=top_k,
+        )
+
+        if results["documents"] and results["documents"][0]:
+            for i, (doc, meta) in enumerate(zip(results["documents"][0], results["metadatas"][0])):
+                email_context += f"**Email {i+1}** (From: {meta.get('sender', 'unknown')}, "
+                email_context += f"Date: {meta.get('date', 'unknown')}, "
+                email_context += f"Subject: {meta.get('subject', '')})\n"
+                email_context += f"{doc[:500]}\n\n"
+    else:
+        email_context += "(Email search unavailable — ChromaDB not configured)\n\n"
 
     # 2. Graph context for mentioned people
     mentioned = extract_mentioned_people(question, graph_data)
