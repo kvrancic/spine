@@ -35,11 +35,11 @@ async def chat(request: ChatRequest):
 
     def generate():
         stream = client.chat.completions.create(
-            model="gpt-4.1",
+            model="gpt-5.2",
             messages=messages,
             stream=True,
             temperature=0.3,
-            max_tokens=2000,
+            max_completion_tokens=2000,
         )
         for chunk in stream:
             if chunk.choices[0].delta.content:

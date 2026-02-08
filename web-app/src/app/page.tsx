@@ -49,10 +49,24 @@ export default function LandingPage() {
       {/* Shader background */}
       <ShaderAnimation />
 
-      {/* Wordmark */}
-      <div className="absolute top-8 left-0 right-0 flex justify-center z-10">
-        <h1 className="text-white text-4xl font-bold tracking-tight">Spine</h1>
-      </div>
+      {/* Wordmark — animated with shader via blend mode */}
+      <motion.div
+        className="absolute top-16 left-0 right-0 flex justify-center z-10 pointer-events-none"
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 1.2, ease: "easeOut" }}
+      >
+        <h1
+          className="text-[56pt] font-bold tracking-tight"
+          style={{
+            color: "white",
+            mixBlendMode: "difference",
+            textShadow: "0 0 60px rgba(255,255,255,0.3), 0 0 120px rgba(255,255,255,0.1)",
+          }}
+        >
+          Spine
+        </h1>
+      </motion.div>
 
       {/* Content overlay */}
       <div className="relative z-10 min-h-screen flex items-center justify-center px-8">

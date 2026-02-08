@@ -124,9 +124,10 @@ class TestPeopleEndpoints:
         assert "workstreams" in data
         assert len(data["workstreams"]) >= 3
         assert "emails_per_day" in data
-        assert "betweenness" in data
-        assert "spof_risk" in data
+        assert "in_degree_norm" in data
+        assert "out_degree_norm" in data
         assert "peer_rank" in data
+        assert "comparable_peers" in data
 
     def test_get_person_panel_not_found(self):
         r = client.get("/api/people/nonexistent@enron.com/panel")
