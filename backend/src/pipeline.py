@@ -149,6 +149,7 @@ def run_pipeline(
     print(f"  graph.json: {len(nodes)} nodes, {len(edges)} edges")
 
     # --- communities.json ---
+    community_labels = communities.get("labels", {})
     communities_export = {
         "communities": [
             {
@@ -156,6 +157,7 @@ def run_pipeline(
                 "members": c["members"],
                 "size": c["size"],
                 "density": c["density"],
+                "label": community_labels.get(c["id"], f"Community {c['id']}"),
             }
             for c in communities["communities"]
         ],

@@ -22,13 +22,18 @@ router = APIRouter(prefix="/api/people", tags=["people"])
 _graph_data: dict | None = None
 _metrics_data: dict | None = None
 _people_dir: Path | None = None
+_community_labels: dict[int, str] = {}
 
 
-def init(graph_data: dict, metrics_data: dict, people_dir: Path):
-    global _graph_data, _metrics_data, _people_dir
+def init(graph_data: dict, metrics_data: dict, people_dir: Path, communities_data: dict | None = None):
+    global _graph_data, _metrics_data, _people_dir, _community_labels
     _graph_data = graph_data
     _metrics_data = metrics_data
     _people_dir = people_dir
+    if communities_data:
+        for c in communities_data.get("communities", []):
+            if "label" in c:
+                _community_labels[c["id"]] = c["label"]
 
 
 @router.get("", response_model=PeopleListResponse)
@@ -152,10 +157,11 @@ def get_person_panel(person_id: str):
 
     # Role snapshot
     community_id = node.get("community_id", 0)
+    community_label = _community_labels.get(community_id, f"Community {community_id}")
     centrality_rank_label = "high" if betweenness > 0.01 else "moderate" if betweenness > 0.001 else "low"
     role_snapshot = (
-        f"Member of Community {community_id} with {centrality_rank_label} centrality. "
-        f"Sends ~{total_sent} and receives ~{total_received} emails. "
+        f"Member of {community_label} with {centrality_rank_label} centrality. "
+        f"Sends {total_sent} and receives {total_received} emails. "
         f"Acts as a {'key connector' if betweenness > 0.005 else 'regular participant'} in the network."
     )
 

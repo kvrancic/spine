@@ -66,9 +66,87 @@ def detect_communities(G: nx.DiGraph) -> dict:
         if len(neighbor_communities) > 1:
             bridge_nodes.append(node)
 
+    # Assign heuristic labels
+    labels = label_communities(communities, G, partition, betweenness)
+
     return {
         "partition": partition,
         "communities": communities,
         "bridge_nodes": bridge_nodes,
         "modularity": round(modularity, 4),
+        "labels": labels,
     }
+
+
+def label_communities(
+    communities: list[dict],
+    G: nx.DiGraph,
+    partition: dict[str, int],
+    betweenness: dict[str, float],
+) -> dict[int, str]:
+    """Assign descriptive labels to communities based on graph characteristics."""
+    # Precompute per-community stats
+    stats = []
+    for comm in communities:
+        members = comm["members"]
+        size = comm["size"]
+        density = comm["density"]
+
+        avg_betw = (
+            sum(betweenness.get(m, 0) for m in members) / size if size > 0 else 0
+        )
+        avg_degree = (
+            sum(G.degree(m) for m in members if G.has_node(m)) / size
+            if size > 0
+            else 0
+        )
+
+        # Count bridge nodes (members connected to other communities)
+        bridge_count = 0
+        inter_edges = 0
+        for m in members:
+            if not G.has_node(m):
+                continue
+            for neighbor in set(G.predecessors(m)) | set(G.successors(m)):
+                if neighbor in partition and partition[neighbor] != comm["id"]:
+                    inter_edges += 1
+                    bridge_count += 1
+                    break  # only count member once as bridge
+
+        bridge_ratio = bridge_count / size if size > 0 else 0
+
+        stats.append({
+            "id": comm["id"],
+            "size": size,
+            "density": density,
+            "avg_betweenness": avg_betw,
+            "avg_degree": avg_degree,
+            "bridge_ratio": bridge_ratio,
+            "inter_edges": inter_edges,
+        })
+
+    # Sort by avg_betweenness descending to assign labels
+    ranked = sorted(stats, key=lambda s: s["avg_betweenness"], reverse=True)
+
+    labels: dict[int, str] = {}
+    ops_counter = 0
+
+    for rank, s in enumerate(ranked):
+        cid = s["id"]
+        if s["size"] < 5:
+            labels[cid] = "Small Team" if s["size"] >= 3 else "Working Pair"
+        elif rank == 0 and s["bridge_ratio"] > 0.3:
+            labels[cid] = "Executive & Strategy"
+        elif s["density"] > 0.15 and s["size"] < 100:
+            labels[cid] = "Specialized Unit"
+        elif s["size"] > 500 and s["density"] < 0.02:
+            labels[cid] = "Extended Network"
+        elif s["avg_degree"] > 15 and s["inter_edges"] > 50:
+            labels[cid] = "Trading & Communications"
+        elif s["density"] > 0.05 and 20 < s["size"] < 500:
+            labels[cid] = "Core Operations"
+        else:
+            ops_counter += 1
+            labels[cid] = f"Operations Group {chr(64 + ops_counter)}"
+
+    return labels

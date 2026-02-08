@@ -37,9 +37,9 @@ def load_data():
         communities_data = json.load(f)
 
     # Initialize route modules with data
-    graph.init(graph_data)
+    graph.init(graph_data, communities_data)
     metrics.init(metrics_data, communities_data, graph_data)
-    people.init(graph_data, metrics_data, people_dir)
+    people.init(graph_data, metrics_data, people_dir, communities_data)
     trends.init(graph_data, metrics_data, communities_data)
     risks.init(graph_data, metrics_data)
 

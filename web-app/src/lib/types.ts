@@ -32,6 +32,7 @@ export interface GraphEdge {
 export interface GraphData {
   nodes: GraphNode[];
   edges: GraphEdge[];
+  community_names?: Record<number, string>;
 }
 
 export interface HealthSubScores {

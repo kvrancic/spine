@@ -37,6 +37,7 @@ class EdgeResponse(BaseModel):
 class GraphResponse(BaseModel):
     nodes: list[NodeResponse]
     edges: list[EdgeResponse]
+    community_names: dict[int, str] = {}
 
 
 class NodeDetailResponse(BaseModel):
@@ -90,6 +91,7 @@ class CommunityResponse(BaseModel):
     members: list[str]
     size: int
     density: float
+    label: str = ""
 
 
 class CommunitiesResponse(BaseModel):

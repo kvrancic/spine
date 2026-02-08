@@ -8,11 +8,16 @@ router = APIRouter(prefix="/api/graph", tags=["graph"])
 
 # Data is loaded at startup and injected via app.state
 _graph_data: dict | None = None
+_community_labels: dict[int, str] = {}
 
 
-def init(graph_data: dict):
-    global _graph_data
+def init(graph_data: dict, communities_data: dict | None = None):
+    global _graph_data, _community_labels
     _graph_data = graph_data
+    if communities_data:
+        for c in communities_data.get("communities", []):
+            if "label" in c:
+                _community_labels[c["id"]] = c["label"]
 
 
 @router.get("", response_model=GraphResponse)
@@ -21,6 +26,7 @@ def get_graph():
     return GraphResponse(
         nodes=[NodeResponse(**n) for n in _graph_data["nodes"]],
         edges=[EdgeResponse(**e) for e in _graph_data["edges"]],
+        community_names=_community_labels,
     )
 
 
