@@ -150,16 +150,42 @@ def get_person_panel(person_id: str):
             if fe and (first_email is None or fe < first_email):
                 first_email = fe
 
-    # Communication health
-    total_sent = node.get("total_sent", 0)
-    total_received = node.get("total_received", 0)
+    # Communication health — use actual edge email_count sums
+    out_email_count = 0
+    in_email_count = 0
+    edge_first_dates: list[str] = []
+    edge_last_dates: list[str] = []
+    for e in _graph_data.get("edges", []):
+        if e["source"] == person_id:
+            out_email_count += e.get("email_count", 0)
+        if e["target"] == person_id:
+            in_email_count += e.get("email_count", 0)
+        if e["source"] == person_id or e["target"] == person_id:
+            if e.get("first_email"):
+                edge_first_dates.append(e["first_email"])
+            if e.get("last_email"):
+                edge_last_dates.append(e["last_email"])
+
+    total_sent = out_email_count if out_email_count > 0 else node.get("total_sent", 0)
+    total_received = in_email_count if in_email_count > 0 else node.get("total_received", 0)
     total = total_sent + total_received
     in_pct = round((total_received / total) * 100, 1) if total > 0 else 50.0
     out_pct = round(100 - in_pct, 1)
 
-    # Mock fields seeded from node ID
+    # Compute actual date range for emails_per_day
+    if edge_first_dates and edge_last_dates:
+        try:
+            from datetime import datetime as _dt
+            d1 = _dt.fromisoformat(min(edge_first_dates).replace("Z", "+00:00"))
+            d2 = _dt.fromisoformat(max(edge_last_dates).replace("Z", "+00:00"))
+            days_span = max((d2 - d1).days, 1)
+        except Exception:
+            days_span = 730
+    else:
+        days_span = 730
+
     s = _seed(person_id)
-    emails_per_day = round(total_sent / max(1, 365 * 2), 1)  # ~2 years of data
+    emails_per_day = round(total_sent / days_span, 1)
     median_response_time = round(1 + s * 7, 1)  # 1-8 hrs
 
     if total > 5000:
