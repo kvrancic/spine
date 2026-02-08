@@ -269,8 +269,9 @@ class WasteOffender(BaseModel):
     id: str
     name: str
     waste_score: float
-    broadcast_ratio: float
-    orphan_ratio: float
+    overproduction: float
+    reply_all_ratio: float
+    response_gap: float
 
 
 class RisksResponse(BaseModel):

@@ -101,8 +101,9 @@ def get_risks():
             id=w["id"],
             name=w["name"],
             waste_score=w.get("waste_score", 0),
-            broadcast_ratio=w.get("broadcast_ratio", 0),
-            orphan_ratio=w.get("orphan_ratio", 0),
+            overproduction=w.get("overproduction", 0),
+            reply_all_ratio=w.get("reply_all_ratio", 0),
+            response_gap=w.get("orphan_ratio", 0),
         ))
 
     return RisksResponse(

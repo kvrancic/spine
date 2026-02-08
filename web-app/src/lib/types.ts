@@ -248,8 +248,9 @@ export interface WasteOffender {
   id: string;
   name: string;
   waste_score: number;
-  broadcast_ratio: number;
-  orphan_ratio: number;
+  overproduction: number;
+  reply_all_ratio: number;
+  response_gap: number;
 }
 
 export interface RisksData {

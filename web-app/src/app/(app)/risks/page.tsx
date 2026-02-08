@@ -132,9 +132,10 @@ export default function RisksPage() {
                   <span className="text-sm font-medium">{w.name}</span>
                   <span className="text-xs font-mono">{w.waste_score.toFixed(1)}</span>
                 </div>
-                <div className="flex gap-3 text-xs text-[var(--muted)]">
-                  <span>Broadcast: {(w.broadcast_ratio * 100).toFixed(0)}%</span>
-                  <span>Orphan: {(w.orphan_ratio * 100).toFixed(0)}%</span>
+                <div className="flex flex-col gap-0.5 text-xs text-[var(--muted)]">
+                  <span>Overproduction: {w.overproduction.toFixed(1)} avg recipients</span>
+                  <span>Reply-all ratio: {(w.reply_all_ratio * 100).toFixed(0)}%</span>
+                  <span>Response gap: {(w.response_gap * 100).toFixed(0)}%</span>
                 </div>
               </button>
             ))}
