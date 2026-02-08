@@ -27,10 +27,9 @@ out/
 .env.local
 .env.*.local
 
-# Data & Output (large files)
+# Data (large raw files)
 data/maildir/
 data/enron_mail_20150507.tar.gz
-backend/output/
 
 # ChromaDB
 chroma_data/

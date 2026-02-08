@@ -1,6 +1,7 @@
 """FastAPI app entry point."""
 
 import json
+import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -63,10 +64,15 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow frontend dev server
+# CORS — allow frontend dev server + deployed URL
+_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+_frontend_url = os.environ.get("FRONTEND_URL")
+if _frontend_url:
+    _origins.append(_frontend_url.rstrip("/"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
