@@ -187,6 +187,15 @@ class Workstream(BaseModel):
     percent: int
 
 
+class PeerComparison(BaseModel):
+    name: str
+    betweenness: float = 0
+    pagerank: float = 0
+    total_sent: int = 0
+    total_received: int = 0
+    similarity_score: float = 0
+
+
 class PersonPanelResponse(BaseModel):
     id: str
     name: str
@@ -208,15 +217,9 @@ class PersonPanelResponse(BaseModel):
     median_response_time_hrs: float
     after_hours_activity: str  # Low / Med / High
 
-    # Org Position
-    betweenness: float
-    spof_risk: str  # Low / Medium / High / Critical
-    removal_impact_lcc_pct: float
-    removal_impact_avg_path_pct: float
-
     # Influence & Flow
-    in_degree_bin: str  # Low / Medium / High
-    out_degree_bin: str
+    in_degree_norm: float  # 0.0-1.0 normalized
+    out_degree_norm: float
     response_latency: str  # Low / Med / High
 
     # Recent Changes (14d)
@@ -228,6 +231,7 @@ class PersonPanelResponse(BaseModel):
     peer_rank: int
     peer_total: int
     likely_backups: list[str]
+    comparable_peers: list[PeerComparison] = []
 
 
 class TrendItem(BaseModel):

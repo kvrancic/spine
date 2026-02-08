@@ -8,6 +8,7 @@ from fastapi import APIRouter, HTTPException
 
 from src.api.schemas import (
     ConnectionDetail,
+    PeerComparison,
     PeopleListResponse,
     PersonDetailResponse,
     PersonMetrics,
@@ -146,23 +147,17 @@ def get_person_panel(person_id: str):
     else:
         after_hours = "Low"
 
-    # Org position
     betweenness = node.get("betweenness", 0)
-    if dms_score > 0.3:
-        spof_risk = "Critical"
-    elif dms_score > 0.15:
-        spof_risk = "High"
-    elif dms_score > 0.05:
-        spof_risk = "Medium"
-    else:
-        spof_risk = "Low"
 
-    removal_lcc = round(dms_score * 40, 1)
-    removal_path = round(betweenness * 200, 1)
-
-    # Influence & Flow
+    # Influence & Flow — normalize degree to 0-1 range
     in_deg = node.get("in_degree_centrality", 0)
     out_deg = node.get("out_degree_centrality", 0)
+    all_in = [n2.get("in_degree_centrality", 0) for n2 in _graph_data["nodes"]]
+    all_out = [n2.get("out_degree_centrality", 0) for n2 in _graph_data["nodes"]]
+    max_in = max(all_in) if all_in else 1
+    max_out = max(all_out) if all_out else 1
+    in_degree_norm = round(in_deg / max_in, 4) if max_in > 0 else 0
+    out_degree_norm = round(out_deg / max_out, 4) if max_out > 0 else 0
 
     # Role snapshot — use pre-computed email-inferred snapshot if available
     community_id = node.get("community_id", 0)
@@ -208,6 +203,34 @@ def get_person_panel(person_id: str):
             if len(backups) >= 3:
                 break
 
+    # Comparable peers: direct neighbors ranked by similarity
+    node_map = {n2["id"]: n2 for n2 in _graph_data["nodes"]}
+    neighbor_ids: set[str] = set()
+    for e in _graph_data.get("edges", []):
+        if e["source"] == person_id and e["target"] in node_map:
+            neighbor_ids.add(e["target"])
+        elif e["target"] == person_id and e["source"] in node_map:
+            neighbor_ids.add(e["source"])
+
+    comparable = []
+    for nid in neighbor_ids:
+        nb = node_map[nid]
+        # Similarity: inverse of Euclidean distance on key metrics
+        diff_b = abs(nb.get("betweenness", 0) - betweenness)
+        diff_p = abs(nb.get("pagerank", 0) - node.get("pagerank", 0))
+        diff_d = abs(nb.get("degree_centrality", 0) - node.get("degree_centrality", 0))
+        dist = (diff_b ** 2 + diff_p ** 2 + diff_d ** 2) ** 0.5
+        similarity = round(1.0 / (1.0 + dist * 1000), 3)
+        comparable.append(PeerComparison(
+            name=nb["name"],
+            betweenness=round(nb.get("betweenness", 0), 6),
+            pagerank=round(nb.get("pagerank", 0), 6),
+            total_sent=nb.get("total_sent", 0),
+            total_received=nb.get("total_received", 0),
+            similarity_score=similarity,
+        ))
+    comparable.sort(key=lambda p: p.similarity_score, reverse=True)
+
     return PersonPanelResponse(
         id=person_id,
         name=node["name"],
@@ -222,12 +245,8 @@ def get_person_panel(person_id: str):
         out_pct=out_pct,
         median_response_time_hrs=median_response_time,
         after_hours_activity=after_hours,
-        betweenness=round(betweenness, 6),
-        spof_risk=spof_risk,
-        removal_impact_lcc_pct=removal_lcc,
-        removal_impact_avg_path_pct=removal_path,
-        in_degree_bin=_bin_label(in_deg),
-        out_degree_bin=_bin_label(out_deg),
+        in_degree_norm=in_degree_norm,
+        out_degree_norm=out_degree_norm,
         response_latency=_bin_label(_seed(person_id, "latency")),
         volume_delta_pct=vol_delta,
         new_topic=new_topic,
@@ -235,6 +254,7 @@ def get_person_panel(person_id: str):
         peer_rank=peer_rank,
         peer_total=len(community_members),
         likely_backups=backups,
+        comparable_peers=comparable[:5],
     )
 
 

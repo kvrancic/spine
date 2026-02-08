@@ -45,6 +45,23 @@ function Row({ label, value, color }: { label: string; value: string | number; c
   );
 }
 
+function NormBar({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="py-0.5">
+      <div className="flex justify-between items-center text-sm mb-0.5">
+        <span className="text-[var(--muted)]">{label}</span>
+        <span className="font-mono font-medium">{value.toFixed(3)}</span>
+      </div>
+      <div className="w-full bg-gray-100 rounded-full h-1.5">
+        <div
+          className="h-1.5 rounded-full bg-[var(--foreground)]"
+          style={{ width: `${Math.min(value * 100, 100)}%` }}
+        />
+      </div>
+    </div>
+  );
+}
+
 export default function PersonPanel({
   personId,
   onClose,
@@ -155,26 +172,9 @@ export default function PersonPanel({
           <Row label="After-hours" value={data.after_hours_activity} />
         </Section>
 
-        <Section title="Org Position">
-          <Row label="Betweenness" value={data.betweenness.toFixed(5)} />
-          <Row
-            label="SPOF Risk"
-            value={data.spof_risk}
-            color={
-              data.spof_risk === "Critical"
-                ? "text-red-600"
-                : data.spof_risk === "High"
-                  ? "text-orange-500"
-                  : ""
-            }
-          />
-          <Row label="LCC impact" value={`${data.removal_impact_lcc_pct}%`} />
-          <Row label="Path impact" value={`${data.removal_impact_avg_path_pct}%`} />
-        </Section>
-
         <Section title="Influence & Flow">
-          <Row label="In-degree" value={data.in_degree_bin} />
-          <Row label="Out-degree" value={data.out_degree_bin} />
+          <NormBar label="In-degree" value={data.in_degree_norm} />
+          <NormBar label="Out-degree" value={data.out_degree_norm} />
           <Row label="Response latency" value={data.response_latency} />
         </Section>
 
@@ -199,6 +199,28 @@ export default function PersonPanel({
               <div className="space-y-0.5">
                 {data.likely_backups.map((name) => (
                   <p key={name} className="text-sm">{name}</p>
+                ))}
+              </div>
+            </div>
+          )}
+          {data.comparable_peers && data.comparable_peers.length > 0 && (
+            <div className="mt-3">
+              <p className="text-xs text-[var(--muted)] mb-2">Comparable peers:</p>
+              <div className="space-y-2">
+                {data.comparable_peers.map((peer) => (
+                  <div key={peer.name} className="bg-gray-50 rounded-lg p-2">
+                    <p className="text-sm font-medium mb-1">{peer.name}</p>
+                    <div className="grid grid-cols-2 gap-x-3 gap-y-0.5 text-xs">
+                      <span className="text-[var(--muted)]">Betweenness</span>
+                      <span className="font-mono text-right">{peer.betweenness.toFixed(5)}</span>
+                      <span className="text-[var(--muted)]">PageRank</span>
+                      <span className="font-mono text-right">{peer.pagerank.toFixed(5)}</span>
+                      <span className="text-[var(--muted)]">Sent</span>
+                      <span className="font-mono text-right">{peer.total_sent}</span>
+                      <span className="text-[var(--muted)]">Received</span>
+                      <span className="font-mono text-right">{peer.total_received}</span>
+                    </div>
+                  </div>
                 ))}
               </div>
             </div>

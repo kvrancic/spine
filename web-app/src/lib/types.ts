@@ -178,6 +178,15 @@ export interface Workstream {
   percent: number;
 }
 
+export interface PeerComparison {
+  name: string;
+  betweenness: number;
+  pagerank: number;
+  total_sent: number;
+  total_received: number;
+  similarity_score: number;
+}
+
 export interface PersonPanel {
   id: string;
   name: string;
@@ -192,12 +201,8 @@ export interface PersonPanel {
   out_pct: number;
   median_response_time_hrs: number;
   after_hours_activity: string;
-  betweenness: number;
-  spof_risk: string;
-  removal_impact_lcc_pct: number;
-  removal_impact_avg_path_pct: number;
-  in_degree_bin: string;
-  out_degree_bin: string;
+  in_degree_norm: number;
+  out_degree_norm: number;
   response_latency: string;
   volume_delta_pct: number;
   new_topic: string | null;
@@ -205,6 +210,7 @@ export interface PersonPanel {
   peer_rank: number;
   peer_total: number;
   likely_backups: string[];
+  comparable_peers: PeerComparison[];
 }
 
 export interface TrendItem {
