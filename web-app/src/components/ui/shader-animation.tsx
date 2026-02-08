@@ -3,136 +3,120 @@
 import { useEffect, useRef } from "react";
 import * as THREE from "three";
 
-const vertexShader = `
-  varying vec2 vUv;
-  void main() {
-    vUv = uv;
-    gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-  }
-`;
-
-const fragmentShader = `
-  uniform float uTime;
-  uniform vec2 uResolution;
-  varying vec2 vUv;
-
-  // Simplex noise helpers
-  vec3 mod289(vec3 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec2 mod289(vec2 x) { return x - floor(x * (1.0 / 289.0)) * 289.0; }
-  vec3 permute(vec3 x) { return mod289(((x*34.0)+1.0)*x); }
-
-  float snoise(vec2 v) {
-    const vec4 C = vec4(0.211324865405187, 0.366025403784439,
-                       -0.577350269189626, 0.024390243902439);
-    vec2 i  = floor(v + dot(v, C.yy));
-    vec2 x0 = v - i + dot(i, C.xx);
-    vec2 i1 = (x0.x > x0.y) ? vec2(1.0, 0.0) : vec2(0.0, 1.0);
-    vec4 x12 = x0.xyxy + C.xxzz;
-    x12.xy -= i1;
-    i = mod289(i);
-    vec3 p = permute(permute(i.y + vec3(0.0, i1.y, 1.0)) + i.x + vec3(0.0, i1.x, 1.0));
-    vec3 m = max(0.5 - vec3(dot(x0,x0), dot(x12.xy,x12.xy), dot(x12.zw,x12.zw)), 0.0);
-    m = m*m; m = m*m;
-    vec3 x = 2.0 * fract(p * C.www) - 1.0;
-    vec3 h = abs(x) - 0.5;
-    vec3 ox = floor(x + 0.5);
-    vec3 a0 = x - ox;
-    m *= 1.79284291400159 - 0.85373472095314 * (a0*a0 + h*h);
-    vec3 g;
-    g.x = a0.x * x0.x + h.x * x0.y;
-    g.yz = a0.yz * x12.xz + h.yz * x12.yw;
-    return 130.0 * dot(m, g);
-  }
-
-  void main() {
-    vec2 st = vUv;
-    float aspect = uResolution.x / uResolution.y;
-    st.x *= aspect;
-
-    float t = uTime * 0.15;
-
-    // Layered noise for organic flowing effect
-    float n1 = snoise(st * 1.5 + vec2(t, t * 0.7));
-    float n2 = snoise(st * 3.0 + vec2(-t * 0.5, t * 0.3)) * 0.5;
-    float n3 = snoise(st * 6.0 + vec2(t * 0.3, -t * 0.6)) * 0.25;
-
-    float noise = n1 + n2 + n3;
-
-    // Map to dark grayscale palette
-    float brightness = smoothstep(-1.0, 1.0, noise) * 0.25 + 0.05;
-
-    // Subtle warm/cool shifts
-    vec3 dark = vec3(0.03, 0.03, 0.05);
-    vec3 mid = vec3(0.12, 0.11, 0.14);
-    vec3 light = vec3(0.22, 0.20, 0.25);
-
-    vec3 color = mix(dark, mid, smoothstep(0.05, 0.15, brightness));
-    color = mix(color, light, smoothstep(0.15, 0.30, brightness));
-
-    gl_FragColor = vec4(color, 1.0);
-  }
-`;
-
 export default function ShaderAnimation() {
   const containerRef = useRef<HTMLDivElement>(null);
+  const sceneRef = useRef<{
+    camera: THREE.Camera;
+    scene: THREE.Scene;
+    renderer: THREE.WebGLRenderer;
+    uniforms: any;
+    animationId: number;
+  } | null>(null);
 
   useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
+    if (!containerRef.current) return;
 
-    const scene = new THREE.Scene();
-    const camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0.1, 10);
+    const container = containerRef.current;
+
+    const vertexShader = `
+      void main() {
+        gl_Position = vec4( position, 1.0 );
+      }
+    `;
+
+    const fragmentShader = `
+      #define TWO_PI 6.2831853072
+      #define PI 3.14159265359
+
+      precision highp float;
+      uniform vec2 resolution;
+      uniform float time;
+
+      void main(void) {
+        vec2 uv = (gl_FragCoord.xy * 2.0 - resolution.xy) / min(resolution.x, resolution.y);
+        float t = time*0.05;
+        float lineWidth = 0.002;
+
+        vec3 color = vec3(0.0);
+        for(int j = 0; j < 3; j++){
+          for(int i=0; i < 5; i++){
+            color[j] += lineWidth*float(i*i) / abs(fract(t - 0.01*float(j)+float(i)*0.01)*5.0 - length(uv) + mod(uv.x+uv.y, 0.2));
+          }
+        }
+
+        gl_FragColor = vec4(color[0],color[1],color[2],1.0);
+      }
+    `;
+
+    const camera = new THREE.Camera();
     camera.position.z = 1;
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
-    renderer.setSize(container.clientWidth, container.clientHeight);
-    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    container.appendChild(renderer.domElement);
+    const scene = new THREE.Scene();
+    const geometry = new THREE.PlaneGeometry(2, 2);
 
     const uniforms = {
-      uTime: { value: 0 },
-      uResolution: {
-        value: new THREE.Vector2(container.clientWidth, container.clientHeight),
-      },
+      time: { type: "f", value: 1.0 },
+      resolution: { type: "v2", value: new THREE.Vector2() },
     };
 
     const material = new THREE.ShaderMaterial({
-      vertexShader,
-      fragmentShader,
-      uniforms,
+      uniforms: uniforms,
+      vertexShader: vertexShader,
+      fragmentShader: fragmentShader,
     });
 
-    const geometry = new THREE.PlaneGeometry(2, 2);
     const mesh = new THREE.Mesh(geometry, material);
     scene.add(mesh);
 
-    let animationId: number;
-    const clock = new THREE.Clock();
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+
+    container.appendChild(renderer.domElement);
+
+    const onWindowResize = () => {
+      const width = container.clientWidth;
+      const height = container.clientHeight;
+      renderer.setSize(width, height);
+      uniforms.resolution.value.x = renderer.domElement.width;
+      uniforms.resolution.value.y = renderer.domElement.height;
+    };
+
+    onWindowResize();
+    window.addEventListener("resize", onWindowResize, false);
 
     const animate = () => {
-      uniforms.uTime.value = clock.getElapsedTime();
+      const animationId = requestAnimationFrame(animate);
+      uniforms.time.value += 0.05;
       renderer.render(scene, camera);
-      animationId = requestAnimationFrame(animate);
+
+      if (sceneRef.current) {
+        sceneRef.current.animationId = animationId;
+      }
     };
+
+    sceneRef.current = {
+      camera,
+      scene,
+      renderer,
+      uniforms,
+      animationId: 0,
+    };
+
     animate();
 
-    const handleResize = () => {
-      if (!container) return;
-      const w = container.clientWidth;
-      const h = container.clientHeight;
-      renderer.setSize(w, h);
-      uniforms.uResolution.value.set(w, h);
-    };
-    window.addEventListener("resize", handleResize);
-
     return () => {
-      cancelAnimationFrame(animationId);
-      window.removeEventListener("resize", handleResize);
-      renderer.dispose();
-      geometry.dispose();
-      material.dispose();
-      if (container.contains(renderer.domElement)) {
-        container.removeChild(renderer.domElement);
+      window.removeEventListener("resize", onWindowResize);
+
+      if (sceneRef.current) {
+        cancelAnimationFrame(sceneRef.current.animationId);
+
+        if (container && sceneRef.current.renderer.domElement) {
+          container.removeChild(sceneRef.current.renderer.domElement);
+        }
+
+        sceneRef.current.renderer.dispose();
+        geometry.dispose();
+        material.dispose();
       }
     };
   }, []);
@@ -141,7 +125,11 @@ export default function ShaderAnimation() {
     <div
       ref={containerRef}
       className="absolute inset-0"
-      style={{ zIndex: 0 }}
+      style={{
+        background: "#000",
+        overflow: "hidden",
+        zIndex: 0,
+      }}
     />
   );
 }
